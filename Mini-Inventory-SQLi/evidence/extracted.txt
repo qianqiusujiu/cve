@@ -1,0 +1,12 @@
+# Extracted data via blind SQL injection (verified against database)
+
+## Database name
+1410inventory
+
+## Admin account bcrypt password hash (60 chars)
+<REDACTED>  (removed from public repo; verified locally against a throwaway DB)
+
+## Verification
+- Extracted via comma-free boolean blind injection (LIKE prefix + EXP(1000) oracle)
+- Database name matches config: dbname=1410inventory
+- Password hash length 60 verified locally; actual value redacted

