@@ -7,6 +7,7 @@
 | 漏洞 | 项目 | CWE | 状态 |
 |---|---|---|---|
 | [Mini-Inventory-and-Sales SQL Injection](./Mini-Inventory-SQLi/) | Mini-Inventory-and-Sales-Management-System | CWE-89 | 已提交 VulDB（审核中） |
+| [youtube-downloader SSRF](./youtube-downloader-SSRF/) | athlon1600/youtube-downloader | CWE-918 | 已提交 VulDB（审核中） |
 
 ## 说明
 

