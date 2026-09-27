@@ -1,0 +1,11 @@
+A vulnerability has been found in the php package "athlon1600/youtube-downloader" and classified as high. Affected is the function stream of the file public/stream.php and src/YouTubeStreamer.php. The manipulation of the argument url leads to a server-side request forgery (SSRF). The endpoint is unauthenticated. The application fetches any http:// or https:// URL supplied via the "url" query parameter using cURL without any allow-list validation (no restriction to the intended googlevideo.com CDN host). Loopback addresses (127.0.0.1), RFC1918 private ranges, and cloud metadata endpoints (169.254.169.254) can therefore be read by a remote attacker. cURL SSL peer/host verification is disabled, and the full upstream response body together with content-type/content-length/content-range headers is forwarded back to the attacker, resulting in full read-back of internal services.
+
+Exploitation was confirmed empirically in a local, isolated environment: the unmodified library class was used to request an internal endpoint (http://127.0.0.1:8899/internal-secret); the internal HTTP 200 response, its Content-Type header, and the JSON body were returned verbatim to the caller.
+
+Entry point: GET /public/stream.php?url=http%3A%2F%2F127.0.0.1%3A8899%2Finternal-secret
+
+It is recommended to restrict the accepted URL to the YouTube CDN host (e.g. ^https://[\w.-]*\.googlevideo\.com/) and/or add a loopback/private-IP blocklist with DNS-rebinding-safe resolution before performing the cURL request.
+
+CVSS 3.1: AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N (Base 7.5, High)
+
+External disclosure: https://gist.github.com/qianqiusujiu/87a7d7d8bd7fb53cf8529e0bafbeafba
