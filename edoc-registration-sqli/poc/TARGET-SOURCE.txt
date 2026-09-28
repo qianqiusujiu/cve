@@ -1,0 +1,13 @@
+Target source (vulnerable version tested)
+Repository: https://github.com/HashenUdara/edoc-doctor-appointment-system
+Commit    : cc258425b915d1af9e298777ccd26d160493e68d  (2026-08-04, default branch HEAD at time of testing; no release tag)
+
+Clone & pin to the exact tested version:
+  git clone https://github.com/HashenUdara/edoc-doctor-appointment-system.git
+  cd edoc-doctor-appointment-system
+  git checkout cc258425b915d1af9e298777ccd26d160493e68d
+
+Setup: import the bundled .sql into a throwaway MySQL, point the app config
+at it, then serve with:  php -S 127.0.0.1:8080 -t <app-dir>
+See README.md in this directory for the exact steps and the vulnerability
+root cause (file:line).

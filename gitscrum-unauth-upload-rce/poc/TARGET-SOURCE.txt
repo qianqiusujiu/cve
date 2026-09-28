@@ -1,0 +1,13 @@
+Target source (vulnerable version tested)
+Repository: https://github.com/gitscrum-community/laravel-gitscrum
+Commit    : a8bd5d759dbe976596aaf4a982e3afb982e3044c  (2025-05-14, default branch HEAD at time of testing; no release tag)
+
+Clone & pin to the exact tested version:
+  git clone https://github.com/gitscrum-community/laravel-gitscrum.git
+  cd laravel-gitscrum
+  git checkout a8bd5d759dbe976596aaf4a982e3afb982e3044c
+
+Setup: import the bundled .sql into a throwaway MySQL, point the app config
+at it, then serve with:  php -S 127.0.0.1:8080 -t <app-dir>
+See README.md in this directory for the exact steps and the vulnerability
+root cause (file:line).
