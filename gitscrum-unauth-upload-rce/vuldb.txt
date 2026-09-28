@@ -1,0 +1,24 @@
+Title
+GitScrum Arbitrary File Upload Remote Code Execution (Laravel 5.5)
+
+Vendor
+laravel (https://github.com/laravel)
+
+Product
+GitScrum (https://github.com/laravel/gitscrum)
+
+Version
+n/a (master branch, latest as of 2026-09-27; no fixed release; Laravel framework 5.5.x per composer.lock)
+
+Class
+Unrestricted Upload of File with Dangerous Type (CWE-434)
+
+Description
+GitScrum is an open-source task manager and Scrum/Agile tool built on the Laravel framework and published under the laravel GitHub organization (github.com/laravel/gitscrum, about 2,900 stars). The attachment upload endpoint POST /attachments/store (multipart/form-data, field "attachment") can be reached without any authentication or CSRF token: the "attachments" route group in routes/web.php:110-113 lacks the user.authenticated middleware that every other state-changing route group in the application carries, the global middleware in app/Http/Kernel.php contains no CSRF protection (no VerifyCsrfToken class exists anywhere in the codebase), and app/Http/Requests/AttachmentRequest.php:14-28 hardcodes authorize() to true with the only validation rule being "attachment => required" (no file, mimes, extension or size check). In app/Services/AttachmentService.php:19-30 the stored filename is built as time() concatenated with $request->attachment->getClientOriginalExtension(), and the file is moved into public_path('attachments'). The client fully controls the file extension, so any .php extension is preserved verbatim and the file lands inside the web root, where it is executed as PHP by the web server; only the filename prefix (a unix timestamp) is server-generated, which makes uploaded files trivially locatable by brute-forcing the timestamp. No account, no session cookie and no CSRF token are required; the request works against a default installation serving public/. Verification: a POST to /attachments/store carrying a harmless marker payload (a PHP file containing only an echo of a test string concatenated with md5("poc")) with no session cookie and no CSRF token stored the file as public/attachments/1790538056.php; a subsequent GET request to /attachments/1790538056.php returned HTTP 200 with the body GITSCRUM-01-TEST-302fac1d6d73cf4fdf2c9919195df864, which is exactly md5("poc"), proving that attacker-supplied PHP code executed under the web server user. Notably, the upload POST answers HTTP 500 after the file has already been written (an AttachmentObserver dereferences the unauthenticated Auth::user() value after move()), so the executable file persists on disk regardless of the error response; with any authenticated account the same request returns the success redirect, confirming the missing authentication gate. Impact: an unauthenticated remote attacker can upload and execute arbitrary PHP code with the privileges of the web server user, leading to complete loss of confidentiality, integrity and availability on the application host. Fix: protect the attachments route group with the authentication middleware; validate uploads with a strict whitelist (required|file|mimes:jpg,jpeg,png,gif,pdf,zip|max:...); derive the stored extension from the server-side whitelist instead of getClientOriginalExtension(); and keep uploads outside the public web root, serving them through a controller with sanitised headers.
+CVSS 3.1 score: 9.8 (Critical) - AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/18e74615271f9b013fb22ed2f814d283
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on laravel/gitscrum and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.

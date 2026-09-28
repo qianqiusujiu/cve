@@ -1,0 +1,36 @@
+Title
+Hospital-Management-System Appointment Booking SQL Injection (vanilla PHP + MySQLi)
+
+Vendor
+kishan0725
+
+Product
+Hospital-Management-System (vanilla PHP + MySQLi)
+
+Version
+n/a (master branch, commit 777fda46b77a820977a5ba616283dbfbc40bf7e1, last commit 2024-10-07; no official release version)
+
+Class
+CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection') (CWE-89)
+
+Description
+Hospital-Management-System (github.com/kishan0725/Hospital-Management-System) is a hospital management web application written in plain PHP with a MySQLi backend.
+
+The appointment-booking handler of the patient dashboard (admin-panel.php, POST app-submit=1) reads nine POST fields into variables at lines 27-33 without filtering. fname, lname, gender, contact and email are subsequently overwritten from $_SESSION values, so only doctor, docFees, appdate and apptime remain attacker-controlled in the SQL. The file has no session check of any kind. Two sinks consume the values:
+
+1. Duplicate-check SELECT (line 42): $doctor, $appdate and $apptime are interpolated raw into the SELECT that counts existing bookings. Fully unauthenticated injection: POSTing apptime = x' OR (SELECT 858)>(SELECT SLEEP(1))-- - completed in 18.26 s versus ~0.1 s baselines (the OR predicate is evaluated per scanned row: 17 seeded appointmenttb rows x SLEEP(1)).
+
+2. INSERT (line 45): insert into appointmenttb(...) values($pid,'$fname',...,'$apptime','1','1') concatenates the same values raw. This sink requires an authenticated patient session, which is stated here as a factual prerequisite: unauthenticated, the empty $pid produces values(,'',...), a parse error whose uncaught mysqli_sql_exception yields HTTP 500 - SLEEP() is never evaluated. With a patient session (pid=1), docFees = 1'+(SELECT SLEEP(2))+'1 evaluated to 2, the request took 2.12 s versus a 0.12 s baseline, and the stored row shows docFees=2, proving expression evaluation inside VALUES. The required patient session is obtainable without valid credentials through a separate SQL injection authentication bypass in the same project (patient login, func.php), so the end-to-end chain remains unauthenticated.
+
+Payload note (MySQL 8.0.39): quoted-arithmetic constant expressions such as 'x'+(SELECT SLEEP(n))+'y' are unreliable - the AND form short-circuits in WHERE clauses (SLEEP operand never evaluated) and strict mode raises error 1292 in INSERT VALUES; numeric-string operands as shown avoid the cast error, and the OR-comparison form is the reliable time oracle.
+
+Impact: an unauthenticated attacker can time-based-extract database content via the duplicate-check SELECT; with a (freely obtainable) patient session, arbitrary rows can be injected into appointmenttb and stored values such as docFees can be manipulated, corrupting scheduling and billing data.
+
+Fix: use prepared statements with bound parameters for both the duplicate-check SELECT and the INSERT, and enforce authentication before any database access.
+CVSS 3.1 score: 8.2 (High) - AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:H/A:N
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/6623a33a584d0e8d16a20123ce60dc71
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on kishan0725/Hospital-Management-System and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.

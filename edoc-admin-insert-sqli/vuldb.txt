@@ -1,0 +1,24 @@
+Title
+edoc-doctor-appointment-system SQL Injection (admin doctor creation)
+
+Vendor
+HashenUdara
+
+Product
+edoc-doctor-appointment-system (vanilla PHP + MySQL via mysqli)
+
+Version
+n/a (main branch, commit cc258425b915d1af9e298777ccd26d160493e68d, latest as of 2026-09-27; no official tagged release)
+
+Class
+Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection') (CWE-89)
+
+Description
+edoc-doctor-appointment-system is an open-source PHP/MySQL medical appointment web application (HashenUdara/edoc-doctor-appointment-system on GitHub). admin/add-new.php, the target of the admin panel "Add New Doctor" form, reads seven POST fields without sanitization (lines 44-50). Line 54 interpolates $email into the duplicate-check SELECT "select * from webuser where email='$email';" (injectable, boolean oracle), and line 59 builds "insert into doctor(docemail,docname,docpassword,docnic,doctel,specialties) values('$email','$name','$password','$nic','$tele',$spec);" where $spec comes from $_POST['spec'] and is concatenated WITHOUT surrounding quotes before execution via mysqli::query() on line 61; a second concatenated INSERT into the webuser account table follows on lines 60/62. The page requires an administrator session ($_SESSION['usertype']=='a'); the repository ships default administrator credentials admin@edoc.com / <REDACTED> (3-character numeric password; default vendor credentials shipped in SQL_Database_edoc.sql line 43), so deployments that keep the shipped SQL dump expose this endpoint in practice. Verified on a local, isolated MySQL 8.0 / PHP 8.4 instance with the seeded administrator account: submitting spec = (SELECT SLEEP(5)) returned in 5.05 s versus a 0.03 s baseline, and the created doctor row stored specialties=0 - the SLEEP() return value - proving that the subquery executed inside the INSERT; the webuser row is created as well (second sink). Because $spec lands in an unquoted numeric position, the injection requires no quote escaping, and the stored specialties value returns subquery results such as (SELECT version()) to the attacker, giving a direct database read primitive; the INSERT tuple can also be rewritten to append arbitrary rows, and long SLEEP chains cause denial of service. Impact: SQL injection behind an administrator session (practically reachable on default deployments due to the shipped credentials) allowing database enumeration and data manipulation via time-based oracle and stored-value return, plus denial of service. Fix: use prepared statements with bound parameters for all three queries (duplicate-check SELECT, doctor INSERT, webuser INSERT), cast spec to an integer, validate email with filter_var(..., FILTER_VALIDATE_EMAIL), and force administrators to replace the credentials shipped in the SQL dump.
+CVSS 3.1 score: 5.5 (Medium) - AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:L/A:N
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/e7be453f6188eca39679ed3a5a576cad
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on https://github.com/HashenUdara/edoc-doctor-appointment-system and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.

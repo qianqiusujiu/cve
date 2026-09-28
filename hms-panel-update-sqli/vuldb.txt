@@ -1,0 +1,38 @@
+Title
+Hospital-Management-System Appointment Cancellation SQL Injection (vanilla PHP + MySQLi)
+
+Vendor
+kishan0725
+
+Product
+Hospital-Management-System (vanilla PHP + MySQLi)
+
+Version
+n/a (master branch, commit 777fda46b77a820977a5ba616283dbfbc40bf7e1, last commit 2024-10-07; no official release version)
+
+Class
+CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection') (CWE-89)
+
+Description
+Hospital-Management-System (github.com/kishan0725/Hospital-Management-System) is a hospital management web application written in plain PHP with a MySQLi backend.
+
+Both appointment-cancellation handlers concatenate the GET parameter ID directly into UPDATE statements and execute them with mysqli_query, and neither file performs any session or role check (both panels only read $_SESSION values without any isset/redirect gate):
+- admin-panel.php line 71 (patient dashboard): update appointmenttb set userStatus='0' where ID = '".$_GET['ID']."'
+- doctor-panel.php line 8 (doctor dashboard): update appointmenttb set doctorStatus='0' where ID = '".$_GET['ID']."'
+
+Two effects were verified against a local instance (MySQL 8.0.39, PHP 8.4.26, display_errors=0, seeded myhmsdb.sql):
+
+1. Unauthenticated appointment cancellation. GET /admin-panel.php?cancel=1&ID=4 with no Cookie header flipped appointmenttb.userStatus from 1 to 0 for row 4 (database diff before/after); GET /doctor-panel.php?cancel=1&ID=2 likewise flipped doctorStatus from 1 to 0. Any anonymous visitor can cancel arbitrary appointments of any patient or doctor.
+
+2. Time-based blind SQL injection. GET /admin-panel.php?cancel=1&ID=999' OR (SELECT 858)>(SELECT SLEEP(1))-- - completed in 12.19 s versus a 0.11 s baseline for ID=999 (the injected OR predicate is evaluated once per row of the scanned table: 12 seeded rows x SLEEP(1)). The doctor-panel sink behaved identically (12.17 s vs 0.08 s). This provides a working boolean/time oracle for UPDATE-context data extraction. Note the reliable oracle form is the OR comparison: an AND form with a false first operand short-circuits and never evaluates SLEEP().
+
+An attacker can therefore tamper with arbitrary appointment rows unauthenticated (cancel any appointment, mass-cancel via injected OR clauses) and extract database content through the timing channel.
+
+Fix: use a prepared statement with a bound integer parameter for ID in both files, and add an explicit session/role check at the top of admin-panel.php and doctor-panel.php.
+CVSS 3.1 score: 8.2 (High) - AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:H/A:N
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/7e71df61008170438d62ed50fa94e252
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on kishan0725/Hospital-Management-System and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.

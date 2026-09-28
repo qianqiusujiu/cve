@@ -1,0 +1,32 @@
+Title
+Hospital-Management-System Bill PDF SQL Injection (vanilla PHP + MySQLi)
+
+Vendor
+kishan0725
+
+Product
+Hospital-Management-System (vanilla PHP + MySQLi)
+
+Version
+n/a (master branch, commit 777fda46b77a820977a5ba616283dbfbc40bf7e1, last commit 2024-10-07; no official release version)
+
+Class
+CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection') (CWE-89)
+
+Description
+Hospital-Management-System (github.com/kishan0725/Hospital-Management-System) is a hospital management web application written in plain PHP with a MySQLi backend; the shipped seed database (myhmsdb.sql) stores patient accounts in table patreg with plaintext passwords.
+
+The bill-generation flow of the patient dashboard (admin-panel.php, GET generate_bill=1) builds at line 86: select p.pid, ..., a.docFees from prestb p inner join appointmenttb a on p.ID=a.ID and p.pid = '$pid' and p.ID = '".$_GET['ID']."' - the GET parameter ID is concatenated raw into the SELECT, and $pid is an empty session value when the request is unauthenticated. admin-panel.php contains no session check of any kind (it only reads $_SESSION values without an isset/redirect gate). The query result rows are rendered into the generated bill document (TCPDF, Output('bill.pdf','I')), giving the injection a read-back channel: extracted rows come back to the attacker as a downloadable PDF.
+
+Verified against a local instance (MySQL 8.0.39, PHP 8.4.26, display_errors=0, seeded myhmsdb.sql): GET /admin-panel.php?ID=9999' UNION SELECT 1,@@version,3,4,5,6,7,8,9,10,11 FROM patreg-- -&generate_bill=1 returned a 11844-byte PDF versus a 7022-byte baseline PDF for ID=1. Decompressing the TCPDF FlateDecode content streams confirmed the injected UNION row (the @@version string) inside the document. Substituting the patreg email and password columns for the @@version position injected all 11 patient rows, each with the email and its adjacent plaintext password, into the generated bill PDF (credential values withheld from this disclosure; presence confirmed by decompressed-stream diff against the baseline PDF, which contains none of them). The UNION requires exactly 11 result columns.
+
+An unauthenticated attacker can read arbitrary tables and columns of the backend database; the bill PDF hands the extracted rows back as a file, a reliable exfiltration channel that does not depend on error output (display_errors is disabled).
+
+Fix: use a prepared statement with a bound parameter for ID (and pid), enforce an authenticated session before any database access in admin-panel.php, and hash the stored passwords.
+CVSS 3.1 score: 7.5 (High) - AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/d02815e9261c8de9e8afc46db844ec16
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on kishan0725/Hospital-Management-System and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.

@@ -1,0 +1,32 @@
+Title
+Hospital-Management-System Contact Form SQL Injection (vanilla PHP + MySQLi)
+
+Vendor
+kishan0725
+
+Product
+Hospital-Management-System (vanilla PHP + MySQLi)
+
+Version
+n/a (master branch, commit 777fda46b77a820977a5ba616283dbfbc40bf7e1, last commit 2024-10-07; no official release version)
+
+Class
+CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection') (CWE-89)
+
+Description
+Hospital-Management-System (github.com/kishan0725/Hospital-Management-System) is a hospital management web application written in plain PHP with a MySQLi backend.
+
+The public contact page contact.php concatenates four unfiltered POST fields (txtName, txtEmail, txtPhone, txtMsg, submitted via btnSubmit=1) directly into an INSERT statement executed at lines 5-11: insert into contact(name,email,contact,message) values('$name','$email','$contact','$message'); No authentication is required - the contact form is a public page and the handler applies no escaping or prepared statement.
+
+Verified against a local instance (MySQL 8.0.39, PHP 8.4.26, display_errors=0, seeded myhmsdb.sql): submitting txtPhone = x',(SELECT SLEEP(5)))-- - rewrites the VALUES list to exactly four columns, turning the 4th column into the expression (SELECT SLEEP(5)) and commenting out the tail. The request completed in 5.04 s versus a 0.03 s baseline. The stored row proves the expression was evaluated by the database: the injected row contains contact='x' and message='0', where 0 is the return value of SLEEP(5).
+
+This is a blind INSERT-context injection. It supports time-based data extraction (one boolean bit per request via an OR/SLEEP comparison in the injected expression), arbitrary row injection (the VALUES rewrite can change the tuple shape and append additional tuples), and stored-value manipulation; an attacker can also plant misleading contact records. A page that renders the contact table would additionally provide a read-back channel for stored second-order injection.
+
+Fix: use a prepared statement with bound parameters for all four fields.
+CVSS 3.1 score: 6.5 (Medium) - AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/1f50d38f51bcd2110c21b258d067bf61
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on kishan0725/Hospital-Management-System and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.

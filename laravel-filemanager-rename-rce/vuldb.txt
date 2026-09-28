@@ -1,0 +1,24 @@
+Title
+laravel-filemanager Rename Path Traversal Remote Code Execution (v2.15.1)
+
+Vendor
+UniSharp (https://github.com/UniSharp)
+
+Product
+laravel-filemanager (https://github.com/UniSharp/laravel-filemanager)
+
+Version
+2.15.1 (commit 28b491d, master branch as of 2026-09-28)
+
+Class
+Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal') (CWE-22)
+
+Description
+laravel-filemanager is a widely used file manager package for Laravel applications (github.com/UniSharp/laravel-filemanager, about 2,100 stars). The rename endpoint GET /filemanager/rename (route lfm.rename, default middleware web + auth) takes the "file" and "new_name" parameters directly from the request: src/Controllers/RenameController.php:17-80 reads them via Lfm::input() (src/Lfm.php:31-34), which returns raw request input with no sanitization. All filename validation is config-gated and disabled by default: the alphanumeric_filename/alphanumeric_directory checks at RenameController.php:39-58 are skipped entirely because both options default to false, and the existence check returns false for a free traversal target, so the operation proceeds. The destination path is built by LfmPath::path()/normalizeWorkingDir() (src/LfmPath.php:71-91 and 181-198), which concatenate the raw working_dir and new_name values with no filtering of ".." sequences, no basename() and no realpath() anywhere in src/, and the raw paths are finally handed to the storage disk at src/LfmStorageRepository.php:33 ($this->disk->move($this->path, $new_lfm_path->path('storage'))). The rename operation never re-applies the upload-side extension/mime validation. Any authenticated LFM user can therefore move a previously uploaded file into any directory inside the storage disk - including the web-served storage root - and choose an arbitrary new name and extension. This is a distinct flaw from the two previously published advisories for this package: CVE-2022-40734 covers a path traversal in the download endpoint (arbitrary file READ via DownloadController's working_dir parameter), and CVE-2024-21546 covers a trailing-dot extension bypass in the upload endpoint (fixed in 2.9.1). Neither advisory addresses the rename endpoint, which provides an arbitrary file MOVE with attacker-controlled name and extension, and the audited version 2.15.1 still contains zero ".." sanitization in src/. Verification on a stock Laravel install with untouched package defaults (config not published): 1) a PDF-wrapped PHP marker file (a %PDF-1.4 header around a harmless php echo of md5("poc")) is accepted by the default application/pdf mime whitelist - a direct .php upload is correctly rejected, confirming upload validation works; 2) GET /filemanager/rename?working_dir=/1&file=poc.pdf&new_name=../../poc.php returns 200 and moves the file out of the user's private folder to the disk root with the .php extension; 3) GET /storage/poc.php returns HTTP 200 with LFM-01-TEST-302fac1d6d73cf4fdf2c9919195df864 (= md5("poc")), i.e. attacker-uploaded content now executes as PHP under the web root: authenticated remote code execution on default configuration. The same traversal also moves files into other users' private folders (cross-user write with arbitrary extension; verified with new_name=../2/planted-by-user1.php). Boundaries: within-storage-root arbitrary move works on every version, including 2.15.1 on Flysystem v2/v3; writing outside the storage root additionally requires Flysystem v1 stacks (Laravel 8 and earlier), since Flysystem v2/v3 reject such paths with PathTraversalDetected. The demonstrated RCE does not leave the disk root and therefore affects current versions including 2.15.1. Fix: normalize path segments and reject any ".." component inside LfmPath::normalizeWorkingDir()/setName(), and re-apply the upload extension/mime validation to new_name in RenameController before the move.
+CVSS 3.1 score: 8.8 (High) - AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/95a849d259b0a1f9542888119faa845d
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on UniSharp/laravel-filemanager and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.

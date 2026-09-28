@@ -1,0 +1,24 @@
+Title
+edoc-doctor-appointment-system SQL Injection (patient self-registration)
+
+Vendor
+HashenUdara
+
+Product
+edoc-doctor-appointment-system (vanilla PHP + MySQL via mysqli)
+
+Version
+n/a (main branch, commit cc258425b915d1af9e298777ccd26d160493e68d, latest as of 2026-09-27; no official tagged release)
+
+Class
+Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection') (CWE-89)
+
+Description
+edoc-doctor-appointment-system is an open-source PHP/MySQL medical appointment web application (HashenUdara/edoc-doctor-appointment-system on GitHub). The patient self-registration flow spans two pages: signup.php stores the personal details in $_SESSION['personal'] and redirects to create-account.php, which reads $_POST['newemail'], $_POST['tele'] and $_POST['newpassword'] without any sanitization (create-account.php lines 53-56) and builds two INSERT statements by direct string concatenation executed with mysqli::query(): line 68 "insert into patient(pemail,pname,ppassword,paddress,pnic,pdob,ptel) values('$email','$name','$newpassword','$address','$nic','$dob','$tele');" and line 69 "insert into webuser values('$email','p')". The email duplicate check on lines 59-63 is a prepared statement (bind_param) and is not injectable; the two INSERT statements are. The endpoint requires no authentication - registration is public. Verified on a local, isolated MySQL 8.0 / PHP 8.4 instance by replaying the legitimate two-step flow with a cookie jar: submitting newemail = 1'+(SELECT SLEEP(5))+'1 (URL-encoded; numeric-string arithmetic avoids MySQL strict-mode error 1292 that non-numeric operands would raise) produced a 10.05 s response versus a 0.02 s baseline - the doubled SLEEP(5) proves that BOTH INSERT statements evaluate the injected expression. Stored-value proof: after the request the patient row contains pemail='2' (the expression '1'+(SELECT SLEEP(5))+'1' evaluates numerically to 2) and the webuser row contains email='2', confirming execution inside the INSERT context. An unauthenticated attacker can therefore use time-based blind inference to enumerate the database, rewrite the INSERT tuple (a controlled VALUES position can inject additional columns/rows) to store subquery results such as (SELECT version()) into rows that are later readable through the application, append arbitrary rows to the patient table and to the webuser account table, and cause application-level denial of service via long SLEEP chains. Impact: unauthenticated database read via time-based oracle and stored-value exfiltration, tampering with application data and accounts, and denial of service. Fix: replace both concatenated INSERT statements with prepared statements using bound parameters (mysqli prepare/bind_param or PDO), validate newemail with filter_var(..., FILTER_VALIDATE_EMAIL), validate tele server-side, and run the application under a least-privilege database account.
+CVSS 3.1 score: 8.2 (High) - AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N
+
+Advisory / Exploit
+https://gist.github.com/qianqiusujiu/4f86295b5ee13c2c29aa3bb3cac99ed9
+
+Request a CVE
+Optional checkbox. Prerequisites: (1) vendor contacted beforehand - file a GitHub issue on https://github.com/HashenUdara/edoc-doctor-appointment-system and keep the link as evidence, (2) no CVE assigned yet, (3) not submitted to another CNA already.
