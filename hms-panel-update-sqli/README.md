@@ -95,7 +95,8 @@ Runnable PoC: `poc/poc.sh`.
 - Project: https://github.com/kishan0725/Hospital-Management-System
 - Commit: 777fda46b77a820977a5ba616283dbfbc40bf7e1 (master, 2024-10-07)
 - CWE-89: https://cwe.mitre.org/data/definitions/89.html
-- External disclosure: https://gist.github.com/qianqiusujiu/7e71df61008170438d62ed50fa94e252
+
+> 🗑️ External disclosure gist 已下线(2026-09-29): 在先披露密集(issue #71/#64/#49 等),本洞不提交 VulDB。
 - VulDB submission #xxxxxx
 - Local verification record: `evidence/HMS-01.txt`, `evidence/HMS-03.txt`; PoC: `poc/poc.sh`
 

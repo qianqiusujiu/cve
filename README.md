@@ -28,8 +28,8 @@
 | [openvk-poll-enumeration](./openvk-poll-enumeration/) | 见目录 README | CWE-862 | gist 已发布·VulDB 待提交 |
 | [gitscrum-unauth-upload-rce](./gitscrum-unauth-upload-rce/) | 见目录 README | CWE-434 | ❌ COVERED(issue #369 在先披露+厂商拒修)勿提交 |
 | [laravel-filemanager-rename-rce](./laravel-filemanager-rename-rce/) | 见目录 README | CWE-22 | ❌ COVERED(CVE-2022-40734)勿提交 |
-| [hms-auth-bypass](./hms-auth-bypass/) | 见目录 README | CWE-89 | ❌ COVERED(GitHub issue #71)勿提交 |
-| [hms-panel-update-sqli](./hms-panel-update-sqli/) | 见目录 README | CWE-89 | ❌ COVERED(GitHub issue #64/#53)勿提交 |
+| [hms-auth-bypass](./hms-auth-bypass/) | 见目录 README | CWE-89 | ❌ COVERED(GitHub issue #71)勿提交 | · gist 已下线
+| [hms-panel-update-sqli](./hms-panel-update-sqli/) | 见目录 README | CWE-89 | ❌ COVERED(GitHub issue #64/#53)勿提交 | · gist 已下线
 | [hms-union-exfiltration](./hms-union-exfiltration/) | 见目录 README | CWE-89 | ❌ COVERED(GitHub issue #64)勿提交 |
 | [hms-contact-insert-sqli](./hms-contact-insert-sqli/) | 见目录 README | CWE-89 | ❌ COVERED(GitHub issue #49/#6)勿提交 |
 | [hms-appointment-sqli](./hms-appointment-sqli/) | 见目录 README | CWE-89 | gist 已发布·VulDB 待提交 |

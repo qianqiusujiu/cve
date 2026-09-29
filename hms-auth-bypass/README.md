@@ -97,7 +97,8 @@ Complete authentication bypass for both roles. An attacker gains full patient an
 - Project: https://github.com/kishan0725/Hospital-Management-System
 - Commit: 777fda46b77a820977a5ba616283dbfbc40bf7e1 (master, 2024-10-07)
 - CWE-89: https://cwe.mitre.org/data/definitions/89.html
-- External disclosure: https://gist.github.com/qianqiusujiu/e6f00ba806843388cd022557773ef94e
+
+> 🗑️ External disclosure gist 已下线(2026-09-29): 在先披露密集(issue #71/#64/#49 等),本洞不提交 VulDB。
 - VulDB submission #xxxxxx
 - Local verification record: `evidence/HMS-04.txt`, `evidence/HMS-05.txt`; PoC: `poc/poc.sh`
 
