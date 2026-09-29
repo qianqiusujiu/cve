@@ -96,7 +96,8 @@ Runnable PoC: `poc/poc.sh`.
 - Commit: 777fda46b77a820977a5ba616283dbfbc40bf7e1 (master, 2024-10-07)
 - CWE-89: https://cwe.mitre.org/data/definitions/89.html
 
-> 🗑️ External disclosure gist 已下线(2026-09-29): 在先披露密集(issue #71/#64/#49 等),本洞不提交 VulDB。
+> 🔁 External disclosure gist 更新链接(2026-09-29 重新发布,旧链接已作废)。
+- External disclosure: https://gist.github.com/qianqiusujiu/5c3d2362244f1af47f8b30fcbfa93cd1
 - VulDB submission #xxxxxx
 - Local verification record: `evidence/HMS-01.txt`, `evidence/HMS-03.txt`; PoC: `poc/poc.sh`
 
