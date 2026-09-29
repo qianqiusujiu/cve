@@ -1,0 +1,27 @@
+PRA-01 — Reflected XSS in view.php pagination via unescaped REQUEST_URI (getRelativePath)
+Target: phpRedisAdmin 1.26.0 (composer.json version), local: http://127.0.0.1:8095/view.php
+Environment: PHP 8.4.26 (php -S 127.0.0.1:8095), Redis 5.0.14 (127.0.0.1:6379), predis v2.3.0,
+default includes/config.inc.php (count_elements_page=100, no login). Data: list key "users" with 150
+elements (size 150 > 100 -> pagination renders).
+
+REQUEST (curl --path-as-is, raw metacharacters as delivered by an HTTP 30x redirect Location):
+  GET /view.php?s=0&d=0&key=users&page=2"><svg/onload=console.log(1)>&page=999 HTTP/1.1
+
+RESPONSE: HTTP 200, Content-Type: text/html; charset=utf-8
+
+Evidence — pagination div served verbatim (occurs twice, matching echo sites view.php:157 and view.php:278):
+  <div style="width: inherit; word-wrap: break-word;"><a href="view.php?s=0&d=0&key=users"><svg/onload=console.log(1)>&page=998">&#8592;</a>&nbsp;<a href="view.php?s=0&d=0&key=users"><svg/onload=console.log(1)>&page=1">1</a>&nbsp;<a href="view.php?s=0&d=0&key=users"><svg/onload=console.log(1)>&page=2">2</a>&nbsp;&#8594;&nbsp;</div>
+
+Analysis:
+- The attacker's double quote (`page=2"`) closes the href attribute; `<svg/onload=console.log(1)>` is
+  then parsed as a standalone SVG element with an onload event handler (executes on insertion).
+- No htmlspecialchars/htmlentities anywhere in the chain: functions.inc.php:106 getRelativePath()
+  returns raw substr($_SERVER['REQUEST_URI'], ...); view.php:149 only strips /&page=(\d+)/ (note the
+  trailing "&page=999" was indeed removed by that preg_replace while the injected markup survived).
+- Negative control: same URL without payload (/view.php?s=0&d=0&key=users&page=1) renders clean
+  pagination anchors; no injected markup present.
+- Payload is harmless (console.log(1)); marker string "onload=console.log(1)" found 2 times in
+  response body, 0 times in control.
+
+Verdict: VERIFIED (code path + dynamic reproduction, unescaped attacker markup in attribute-breaking
+position within server HTML; browser execution follows from standard HTML parsing of svg/onload).

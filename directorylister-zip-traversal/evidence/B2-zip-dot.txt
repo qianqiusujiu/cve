@@ -1,0 +1,8 @@
+=== [B2] GET /?zip=. (entire base_path, dotfiles excluded by Finder) ===
+HTTP_STATUS=200 SIZE=7568296
+     1793  2024-07-08 12:26   app_vendor_dflydev_dot-access-data_composer.json
+      712  2020-11-24 22:02   app_vendor_fig_http-message-util_composer.json
+     1264  2025-08-08 12:00   app_vendor_filp_whoops_composer.json
+      927  2026-08-24 09:06   app_vendor_graham-campbell_result-type_composer.json
+     1274  2026-03-11 14:13   app_vendor_illuminate_collections_composer.json
+(note: .env / .git dotfiles are excluded by Symfony Finder default dotfile ignore)

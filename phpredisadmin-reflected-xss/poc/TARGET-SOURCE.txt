@@ -1,0 +1,24 @@
+TARGET SOURCE
+=============
+Product:      phpRedisAdmin (Redis web administration front end, PHP + predis)
+Repository:   https://github.com/erikdubbelboer/phpRedisAdmin.git
+Exact commit: 91d0101e5e3a08f9aa22d27aab66c17eb36ce5e1
+Commit date:  2025-12-22 15:53:03 +0100 ("v1.26.0")
+Branch/tag:   master, tagged v1.26.0 (latest release as of verification date)
+
+Clone commands:
+    git clone https://github.com/erikdubbelboer/phpRedisAdmin.git
+    git -C phpRedisAdmin checkout 91d0101e5e3a08f9aa22d27aab66c17eb36ce5e1
+
+Vulnerable files:
+    view.php                    (L149 sink build, L151-191 anchor interpolation,
+                                 L196 and L310 echo sites)
+    includes/functions.inc.php  (L104-106 getRelativePath(): raw REQUEST_URI)
+    includes/config.sample.inc.php (L87 'count_elements_page' => 100)
+
+Local test environment notes (environment-only, no changes to the vulnerable code):
+- php -S 127.0.0.1:8095 serving the repo root (docroot), PHP 8.4.26.
+- Redis 5.0.14 on 127.0.0.1:6379; predis v2.3.0 via composer.
+- includes/config.inc.php created from the shipped sample (defaults:
+  count_elements_page=100, no login) - standard setup, unmodified code.
+- Seed data: list key "users" with 150 elements (150 > 100 -> pagination renders).

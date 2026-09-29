@@ -1,0 +1,2 @@
+=== [C5] GET /?file=../../../Windows/win.ini (outside open_basedir, honest negative) ===
+HTTP_STATUS=404

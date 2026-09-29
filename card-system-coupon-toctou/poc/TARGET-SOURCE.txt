@@ -1,0 +1,38 @@
+TARGET SOURCE
+=============
+Product:      card-system (self-hosted card/license selling platform, Laravel 5.5)
+Repository:   https://github.com/Tai7sy/card-system.git
+Exact commit: 4e908dd55f50f1cb6d70eba0d34efb1ec7d74ea3
+Commit date:  2026-07-26 15:46:18 +0800 ("修改 GitHub 镜像站为可用")
+Branch:       master (no tagged releases; latest master as of verification)
+
+Clone commands:
+    git clone https://github.com/Tai7sy/card-system.git
+    git -C card-system checkout 4e908dd55f50f1cb6d70eba0d34efb1ec7d74ea3
+
+Vulnerable file: app/Http/Controllers/Shop/Pay.php (source shipped as a
+single-line minified file), function buy():
+    - coupon pre-check: plain non-locking SELECT
+      \App\Coupon::where('user_id',...)->where('coupon',$code)
+      ->where('expire_at','>',now())->whereRaw('`count_used`<`count_all`')->get()
+      performed OUTSIDE the order transaction
+    - consumption inside DB::transaction:
+      $coupon->status = \App\Coupon::STATUS_USED; $coupon->count_used++;
+      $coupon->save();   // no SELECT ... FOR UPDATE on the coupon row
+
+Endpoint: POST /api/shop/buy
+    routes/api.php: Route::group(array('prefix' => 'shop',
+                    'middleware' => array('api')), ... Route::any('buy','Shop\\Pay@buy'))
+    app/Providers/RouteServiceProvider.php: routes/api.php mounted under the
+    'api' prefix. 'api' middleware = parameter bindings only - no authentication
+    beyond a client-chosen 'customer' value.
+Framework: Laravel 5.5
+
+Local test environment notes (environment-only, no changes to the vulnerable code):
+- Fully installed local instance: Laravel 5.5, PHP 7.4.33, MySQL 8.0.39.
+- FOUR php -S worker processes (127.0.0.1:8096/8098/8099/8090) share one
+  MySQL so concurrent requests actually race (single-process php -S would
+  serialize them).
+- Seed: product id=1 price=0.01 CNY with 17 unsold cards; single-use coupon
+  'RACE1' (type=ONETIME, count_all=1, discount_type=AMOUNT, discount_val=1 =
+  product price => discounted total 0 => immediate free shipping).

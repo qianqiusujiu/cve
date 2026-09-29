@@ -1,0 +1,31 @@
+Target source (vulnerability research snapshot)
+================================================
+
+Repository URL : https://github.com/ARCANEDEV/LogViewer.git
+Exact commit   : 806498da9792eb34e39df9350a7379a9018eaf5d
+Commit date    : 2024-03-18 22:50:40 +0000 (Bump Version)
+Tag            : 11.0.1 (HEAD == tag at time of testing; latest release as of 2026-09-30)
+Branch         : master
+Package        : arcanedev/log-viewer (composer), consumed by a fresh laravel/laravel v11.6.1 skeleton
+Vulnerable part: config/log-viewer.php lines 56-60 (route middleware defaults to null when
+                 ARCANEDEV_LOGVIEWER_MIDDLEWARE is unset);
+                 src/Http/Routes/LogViewerRoute.php lines 32-66 (all routes registered with the
+                 null middleware attributes, outside the 'web' group);
+                 src/Http/Controllers/LogViewerController.php lines 178-181 (download) and
+                 190-196 (delete; only gate = abort_unless($request->ajax()))
+Verified sha256 of config/log-viewer.php:
+                 ca239a0eca44dce2dabff07b1638faba84ca1d6a0a71473a5bac6a6f9e990ae8
+Verified sha256 of src/Http/Controllers/LogViewerController.php:
+                 a7ce8a335bc9b9318b3ccb4607698a32d1a46b13ac2fae59de3e153f31c4f025
+
+Clone command:
+git clone https://github.com/ARCANEDEV/LogViewer.git
+cd LogViewer
+git checkout 806498da9792eb34e39df9350a7379a9018eaf5d
+
+Application under test (default vulnerable state):
+composer create-project laravel/laravel lgv-test "v11.6.1"
+cd lgv-test
+composer require arcanedev/log-viewer:^11.0     # resolves to 11.0.1
+# keep stock config: ARCANEDEV_LOGVIEWER_MIDDLEWARE unset, route.enabled = true
+php artisan serve --port=8099

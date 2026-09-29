@@ -1,0 +1,25 @@
+=== CARD-02 TOCTOU race on POST /api/shop/buy (coupon double-spend) ===
+App: tai7sy/card-system (Laravel 5.5), local instance 127.0.0.1:8096/8098/8099/8090 (4 php -S processes, shared MySQL 8.0.39 @127.0.0.1:3307)
+Setup: product id=1 price=1 (1 cent), 17 unsold cards; coupon 'RACE1' type=ONETIME count_all=1 discount_type=AMOUNT discount_val=1 (equals product price => paid=0 => free immediate shipping)
+
+--- Attack: 16 concurrent POSTs (4 per server process) released by a barrier, coupon=RACE1 ---
+--- Result (round 1): 3 requests won (HTTP 302 = order created), 13 rejected with 'coupon invalid' ---
+
+=== DB state AFTER the race ===
+order_no	count	price	discount	paid	status	remark	contact
+202609300008248GL2l	1	1	1	0	2	使用优惠券: RACE1	r1_1@t.io
+20260930000824VOgMa	1	1	1	0	2	使用优惠券: RACE1	r1_11@t.io
+20260930000824aeXPi	1	1	1	0	2	使用优惠券: RACE1	r1_2@t.io
+id	coupon	count_used	count_all	status
+2	RACE1	1	1	2
+order_no	card	status	count_sold
+202609300008248GL2l	11111	1	1
+20260930000824VOgMa	11112	1	1
+20260930000824aeXPi	11113	1	1
+
+=== Interpretation ===
+1. A single-use coupon (count_all=1) was applied to THREE concurrent orders.
+2. All three orders have discount=1, paid=0 (100% off) and status=2 (STATUS_SUCCESS).
+3. Three DISTINCT cards were attached and shipped for free (card_order rows below).
+4. Note on count_used: Eloquent persists the stale in-memory counter (0+1=1) with an absolute-value UPDATE, so the counter converges to 1 and the ledger looks clean afterward; the actual double-spend is visible in the orders/shipments (3 free orders from a 1-use coupon).
+5. Root cause: Pay::buy() pre-checks the coupon with a non-locking SELECT (whereRaw count_used<count_all) OUTSIDE the order transaction; consumption (status=USED; count_used++) happens later inside DB::transaction with no SELECT...FOR UPDATE on the coupon row.

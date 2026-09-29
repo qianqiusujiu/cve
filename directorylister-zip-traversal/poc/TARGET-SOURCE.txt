@@ -1,0 +1,23 @@
+Target source (vulnerability research snapshot)
+================================================
+
+Repository URL : https://github.com/DirectoryLister/DirectoryLister.git
+Exact commit   : 0cf8ee1083b0e2f771cbcf7234f616c31c8772f5
+Commit date    : 2026-09-07 09:20:15 -0700 (Updated PHP and JS dependencies)
+Tag            : 5.7.0 (HEAD == tag at time of testing; latest release as of 2026-09-29)
+Branch         : master
+Vulnerable file: app/src/Controllers/ZipController.php
+                  (unchecked full_path resolution at lines 46-48; only gate = is_dir();
+                   shared helper: app/config/container.php:115;
+                   dispatch: app/src/Controllers/IndexController.php:22-29)
+Verified sha256 of the target file: ef5515cdfb05c90df6e3baad1ef7473e80c499d88a222083ca52bdcb5f22e05b
+
+Clone command:
+git clone https://github.com/DirectoryLister/DirectoryLister.git
+cd DirectoryLister
+git checkout 0cf8ee1083b0e2f771cbcf7234f616c31c8772f5
+
+Application under test (default vulnerable state):
+composer install                 # inside the checkout (app/vendor populated)
+php -S 127.0.0.1:8000 index.php  # or the documented docker dev flow with FILES_PATH=/data
+# stock configuration: zip_downloads = true (default), hidden app_files list untouched

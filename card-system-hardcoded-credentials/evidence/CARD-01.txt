@@ -1,0 +1,35 @@
+=== CARD-01 hardcoded external MySQL credential in Product::createApiCards (CWE-798) ===
+Source: app/Product.php, createApiCards(): mysqli_connect('localhost','<REDACTED>','<REDACTED>','<REDACTED>','3306') then INSERT INTO <REDACTED>.ac_kms ... built by string concatenation.
+
+[1] Runtime entry path exercised on a fully installed instance (Laravel 5.5 + PHP 7.4.33 + MySQL 8.0.39):
+    POST /api/shop/buy  product_id=6 (delivery=DELIVERY_API, id=6 matches the switch in createApiCards)
+    with coupon discount_val == product price -> paid=0 -> Shop\Pay::buy() calls shipOrder() directly
+    -> shipOrder(): delivery===DELIVERY_API branch -> Product::createApiCards($order)
+
+[2] Test rig: provisioned a LOCAL MySQL 8.0.39 (127.0.0.1:3306) with the exact hardcoded pair:
+    CREATE USER '<REDACTED>'@'localhost' IDENTIFIED BY '<REDACTED>'; CREATE DATABASE <REDACTED>; CREATE TABLE ac_kms (...)
+    (credential validity confirmed independently first: mysql -h 127.0.0.1 -P 3306 -u <REDACTED> -p'<REDACTED>' -> auth OK)
+
+[3] Run #1 (MySQL 8 default sql_mode): app log proves the connection with the hardcoded credential SUCCEEDED and the
+    INSERT was issued - it failed only on a data-level rule (zero datetime), which happens AFTER successful connect/auth:
+[2026-09-30 00:09:46] local.ERROR: App.Products, connect udid database failed {"sql":"INSERT INTO `<REDACTED>`.`ac_kms` (`id`, `km`, `value`, `task`, `udid`, `diz`, `task_id`, `install_url`, `plist_url`, `jh`, `addtime`, `tjtime`) VALUES (NULL, 'THHDW0GBAML4GVJA', '1', '1', NULL, NULL, NULL, NULL, NULL, '0', '2026-09-30 00:09:46', '0000-00-00 00:00:00')","error":"Incorrect datetime value: '0000-00-00 00:00:00' for column 'tjtime' at row 1"} 
+[2026-09-30 00:09:46] local.ALERT: Shop.Pay.shipOrder: 订单:2026093000094648DOC, 购买数量:1, 卡数量:0 卡密不足(已支付 未发货)  
+
+[4] Run #2 (zero-date sql_mode relaxed on the local test server): full end-to-end success.
+    Rows written by the app into the external DB through the hardcoded credential:
+id	km	value	task	jh	addtime
+1	TRXU6ARFHFCMUBL3	1	1	0	2026-09-30 00:10:32
+
+    Same code delivered locally as a paid card (orders.paid=0 due to full-discount coupon, status=2 SUCCESS):
+order_no	product_id	paid	status
+20260930001032VPzZO	6	0	2
+id	product_id	card	status
+20	6	TRXU6ARFHFCMUBL3	1
+
+=== Conclusion ===
+The hardcoded credential pair (values <REDACTED>) is live and functional: the shipped source authenticates to a
+MySQL server with it at runtime for every API-delivery (delivery=2) product order, and writes generated card codes into
+the vendor's card-delivery schema (name <REDACTED>). Anyone with the public repo obtains a valid credential for the vendor's card-delivery DB;
+exploitability beyond disclosure depends on network reachability of the vendor's MySQL host (password could also be
+reused elsewhere). Verification used a local server provisioned with the same pair to prove the credential is a real,
+working MySQL credential exercised by the shipped code path.

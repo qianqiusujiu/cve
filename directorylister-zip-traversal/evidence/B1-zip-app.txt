@@ -1,0 +1,51 @@
+=== [B1] GET /?zip=app (Config A, app/** is in hidden app_files list) ===
+HTTP/1.1 200 OK
+Content-Type: application/zip
+Content-Disposition: attachment; filename="DirectoryLister/app.zip"
+HTTP_STATUS=200 SIZE=6803444 TYPE=application/zip
+--- zip listing (first 25 entries) ---
+Archive:  app.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+    22895  2026-09-29 15:56   cache_CompiledContainer.php
+      436  2026-09-29 15:56   cache_app_D_T_fsj4OsLHCONL40ntqyiA
+     5222  2026-09-29 15:57   cache_app_O_O_omOM-PwEOjY0+NPrg3qQ
+     3401  2026-09-29 15:56   cache_views_26_26a68a838e37ed178e3c48ab7d6f5f33.php
+     5047  2026-09-29 15:56   cache_views_32_32a67e4ad529a8ffef0298c474f8166e.php
+     3580  2026-09-29 15:57   cache_views_3d_3d15c5177b29d0fac8c9f877294120f9.php
+     3325  2026-09-29 15:56   cache_views_43_4350bafaec110d88603c68d1b4f97ba6.php
+     2335  2026-09-29 15:56   cache_views_88_8850db358461c246a2bf37b2e5eac502.php
+     4112  2026-09-29 15:56   cache_views_93_932ee6644275d827c7bfca42cca043ef.php
+     2732  2026-09-29 15:57   cache_views_b0_b031e3d3327d3cb4f75b9fa7a9451678.php
+     3374  2026-09-29 15:56   cache_views_b2_b2b4823179911efbf0e450924d8ca558.php
+     6904  2026-09-29 15:57   cache_views_c3_c3acc04816b910cdfcfd245b0408a75d.php
+     3479  2026-09-29 15:56   cache_views_c4_c4e6c8e9b0710ac70b2b65cff0be4e2b.php
+     6550  2026-09-29 15:57   cache_views_d7_d764d8aa62828baaad9b3154f152d665.php
+     3706  2026-09-29 15:57   cache_views_e1_e1f849eb43c72f25638eef48c4c24a8c.php
+     4898  2026-09-29 15:07   config_app.php
+     4149  2026-09-29 15:07   config_cache.php
+     4443  2026-09-29 15:07   config_container.php
+     4209  2026-09-29 15:07   config_icons.php
+     1928  2026-09-29 15:07   images_favicon.dark.png
+     1889  2026-09-29 15:07   images_favicon.light.png
+      962  2026-09-29 15:07   resources_css_app.css
+     1961  2026-09-29 15:07   resources_css_markdown.css
+    88572  2026-09-29 15:07   resources_fonts_SourceCodePro.woff2
+   130752  2026-09-29 15:07   resources_fonts_WorkSans.woff2
+      412  2026-09-29 15:07   resources_js_app.js
+      640  2026-09-29 15:07   resources_js_components_Application.js
+--- key sensitive entries check ---
+     3401  2026-09-29 15:56   cache_views_26_26a68a838e37ed178e3c48ab7d6f5f33.php
+     5047  2026-09-29 15:56   cache_views_32_32a67e4ad529a8ffef0298c474f8166e.php
+     3580  2026-09-29 15:57   cache_views_3d_3d15c5177b29d0fac8c9f877294120f9.php
+     3325  2026-09-29 15:56   cache_views_43_4350bafaec110d88603c68d1b4f97ba6.php
+     2335  2026-09-29 15:56   cache_views_88_8850db358461c246a2bf37b2e5eac502.php
+     4112  2026-09-29 15:56   cache_views_93_932ee6644275d827c7bfca42cca043ef.php
+     2732  2026-09-29 15:57   cache_views_b0_b031e3d3327d3cb4f75b9fa7a9451678.php
+     3374  2026-09-29 15:56   cache_views_b2_b2b4823179911efbf0e450924d8ca558.php
+     6904  2026-09-29 15:57   cache_views_c3_c3acc04816b910cdfcfd245b0408a75d.php
+     3479  2026-09-29 15:56   cache_views_c4_c4e6c8e9b0710ac70b2b65cff0be4e2b.php
+--- total entries & controller sources in zip ---
+entries: 1861
+     2235  2026-09-29 15:07   src_Controllers_FileController.php
+     3844  2026-09-29 15:07   src_Controllers_ZipController.php

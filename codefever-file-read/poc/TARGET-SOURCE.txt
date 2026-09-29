@@ -1,0 +1,29 @@
+TARGET SOURCE
+=============
+Product:      Codefever Community (self-hosted Git repository web application)
+Repository:   https://github.com/PGYER/codefever.git
+Exact commit: 0c35e60f006f9d558cc33a159baf110659351990
+Commit date:  2024-12-10 12:08:21 +0800 ("Merge pull request #211 from PGYER/dev/master")
+Branch:       master (no tagged releases; latest master as of verification)
+
+Clone commands:
+    git clone https://github.com/PGYER/codefever.git
+    git -C codefever checkout 0c35e60f006f9d558cc33a159baf110659351990
+
+Vulnerable file: application/controllers/doc.php
+    _detail():  L60-110 (L60 raw uri_string, L66-68 $docFile built with no
+                containment, L79 file_exists gate, L99 file_get_contents echo)
+    _assets():  L121-133 (same unsanitized $docFile)
+Sanitizer under bypass: system/core/URI.php L222
+    str_replace(array('//','../'), '/', trim($uri,'/'))  (CodeIgniter 2.1.1)
+Framework: CodeIgniter 2.1.1 (CI_VERSION in system/core/CodeIgniter.php)
+
+Local test environment notes (environment-only, no changes to the vulnerable code):
+- Served unmodified by: php -S 127.0.0.1:8098 -t www router.php (PHP 7.4.33).
+- Only stub: yaml_parse_file() shim (portable PHP 7.4 lacks pecl-yaml) +
+  env.yaml/config.yaml created from the shipped templates. CI core, routing,
+  controllers, views and DB connection are genuine (MySQL 8.0 reached via
+  application/config/database.php).
+- Requests sent with NO cookies - the endpoint is unauthenticated
+  (Base::__construct never enforces login).
+- PoCs require curl --path-as-is so curl does not normalize dot-segments.

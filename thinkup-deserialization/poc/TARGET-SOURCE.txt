@@ -1,0 +1,25 @@
+Target source (vulnerability research snapshot)
+================================================
+
+Repository URL : https://github.com/ThinkUpLLC/ThinkUp.git
+Exact commit   : ac41d11625d9a2421f4edad397a21300f82d2836
+Commit date    : 2016-06-16 12:14:41 -0400 (Merge pull request #2285 from anildash/shutdown-notice)
+Branch         : master (HEAD at time of testing; project discontinued, no release tags)
+Vulnerable file: webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php
+                  (plaintext $api_url at line 29; unserialize($resp) sink at line 60;
+                   POP entry: webapp/_lib/model/class.PostIterator.php:124-127;
+                   crawler trigger: webapp/plugins/expandurls/model/class.ExpandURLsPlugin.php:271)
+Verified sha256 of the target file: 2cc4bab3a34ade88e39b01eeb3b20b6ba43b74a4017676f7585628c1e22a1ebe
+
+Clone command:
+git clone https://github.com/ThinkUpLLC/ThinkUp.git
+cd ThinkUp
+git checkout ac41d11625d9a2421f4edad397a21300f82d2836
+
+PoC usage (harmless object-injection probe only):
+1. Pin api.flickr.com to 127.0.0.1 in the local hosts file (simulates the on-path attacker).
+2. python serve_payload.py            # answers every GET with payload.bin (attacker probe)
+3. Edit harness.php $REPO to point at the checked-out repo's webapp/ directory.
+4. php harness.php TU01TESTKEY http://flic.kr/p/2m4yAbC
+5. Control run: serve payload-benign.bin instead -> clean exit 0 (differential).
+6. Cleanup: remove the hosts entry and flush the DNS cache.
