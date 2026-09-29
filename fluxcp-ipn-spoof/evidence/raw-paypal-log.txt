@@ -1,0 +1,40 @@
+<?php exit('Forbidden'); ?>
+[2026-09-28 18:40:08] Received notification from 127.0.0.1 (<REDACTED>)
+[2026-09-28 18:40:08] Transaction invalid, aborting.
+[2026-09-28 18:40:33] Received notification from 173.0.81.77 (173.0.81.77)
+[2026-09-28 18:40:33] Proceeding to validate the authenticity of the transaction...
+[2026-09-28 18:40:33] Transaction identified as FAKE-CREDITS-1.
+[2026-09-28 18:40:33] Received 99999 (USD).
+[2026-09-28 18:40:33] Game server name: alice, account ID: 2000000
+[2026-09-28 18:40:33] Payment for txn_id#FAKE-CREDITS-1 has been completed.
+[2026-09-28 18:40:33] Identified as first-time donation to the server from this account.
+[2026-09-28 18:40:33] Updating account credit balance from 0 to 99999
+[2026-09-28 18:40:33] Deposited credits.
+[2026-09-28 18:40:33] Saving transaction details for FAKE-CREDITS-1...
+[2026-09-28 18:40:33] Failed to save transaction details for FAKE-CREDITS-1 to file.
+[2026-09-28 18:40:33] Done processing FAKE-CREDITS-1.
+[2026-09-28 18:40:58] Received notification from 173.0.81.77 (173.0.81.77)
+[2026-09-28 18:40:58] Proceeding to validate the authenticity of the transaction...
+[2026-09-28 18:40:58] Transaction identified as FAKE-BAN-1.
+[2026-09-28 18:40:58] Received 10 (USD).
+[2026-09-28 18:40:58] Game server name: alice, account ID: 2000001
+[2026-09-28 18:40:58] Incomplete payment status: Reversed (exchanging for credits will not take place)
+[2026-09-28 18:40:58] Auto-ban payment status detected: Reversed
+[2026-09-28 18:40:58] Banning account! (serv: alice, account_id: 2000001)
+[2026-09-28 18:40:58] Saving transaction details for FAKE-BAN-1...
+[2026-09-28 18:40:58] Failed to save transaction details for FAKE-BAN-1 to file.
+[2026-09-28 18:40:58] Done processing FAKE-BAN-1.
+[2026-09-28 18:41:28] Received notification from 173.0.81.99 (173.0.81.99)
+[2026-09-28 18:41:28] Proceeding to validate the authenticity of the transaction...
+[2026-09-28 18:41:28] Transaction identified as FAKE-CREDITS-2.
+[2026-09-28 18:41:28] Received 500 (USD).
+[2026-09-28 18:41:28] Game server name: alice, account ID: 2000000
+[2026-09-28 18:41:28] Payment for txn_id#FAKE-CREDITS-2 has been completed.
+[2026-09-28 18:41:28] Identified as first-time donation to the server from this account.
+[2026-09-28 18:41:28] Updating account credit balance from 0 to 500
+[2026-09-28 18:41:28] Deposited credits.
+[2026-09-28 18:41:28] Saving transaction details for FAKE-CREDITS-2...
+[2026-09-28 18:41:28] Failed to save transaction details for FAKE-CREDITS-2 to file.
+[2026-09-28 18:41:28] Done processing FAKE-CREDITS-2.
+[2026-09-28 18:41:28] Received notification from 8.8.8.8 (dns.google)
+[2026-09-28 18:41:28] Transaction invalid, aborting.

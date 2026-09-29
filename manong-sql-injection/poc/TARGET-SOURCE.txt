@@ -1,0 +1,23 @@
+TARGET SOURCE
+=============
+Product:      manong (PHP/MySQL crawler helper for the Manong Weekly archive)
+Repository:   https://github.com/nemoTyrant/manong.git
+Exact commit: 7c9e5228e133b9267ad3a415833bc9bb53193bb4
+Commit date:  2017-09-25 18:56:48 +0800 ("Update README.md")
+Branch:       master (no tagged releases; latest master as of 2026-09-27)
+
+Clone commands:
+    git clone https://github.com/nemoTyrant/manong.git
+    git -C manong checkout 7c9e5228e133b9267ad3a415833bc9bb53193bb4
+
+Vulnerable files:
+    func.php:264   manongdb::cache()   - SELECT interpolation (POST number, a=crawl)
+    func.php:275   manongdb::del_cache() - DELETE interpolation (GET id, a=del)
+    func.php:350-352 arr2sql() insert branch - INSERT value concatenation (a=add)
+    func.php:65/152/126-141 - unfiltered $_POST['number'] / $_GET['id'] / $_GET[...] data
+    index.php:6    $_GET['a'] dynamic function dispatch, no authentication
+
+Local test environment notes (environment-only, no changes to the vulnerable code):
+- PHP 8.4 built-in server; throwaway MySQL 8.0.39 on a local port; only the DSN port in
+  func.php's config was patched to point at the test instance.
+- Schema loaded from the repo's own db.sql/issue.sql.

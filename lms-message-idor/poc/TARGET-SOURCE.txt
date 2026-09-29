@@ -1,0 +1,11 @@
+Target source for: LMS-Laravel Message API Missing Authorization (Laravel 8)
+
+Repository URL : https://github.com/LMS-Laravel/LMS-Laravel.git
+Exact commit   : 55ad5acbc42ec8ea2d887586f0c02eef0367f0a3  (2021-09-24, master HEAD; no release tag)
+Vulnerable file: app/Http/Controllers/MessageController.php (lines 18-24, 32-53, 55-61)
+Route          : routes/api.php:22 (GET|POST /api/message, auth:api middleware)
+
+Clone commands:
+  git clone https://github.com/LMS-Laravel/LMS-Laravel.git lms-laravel
+  cd lms-laravel
+  git checkout 55ad5acbc42ec8ea2d887586f0c02eef0367f0a3

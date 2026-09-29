@@ -1,0 +1,26 @@
+## e01: Environment, installation and admin-login transcript (all 127.0.0.1-local)
+
+### Environment
+- Target: opensource-socialnetwork, cloned from https://github.com/opensource-socialnetwork/opensource-socialnetwork (default branch, master HEAD at test time; .htaccess self-identifies as v9.1.0.0, ChangeLog top entry #2608/#2538/#2489)
+- PHP 8.4.26 (C:/php/php.exe), extensions: pdo_mysql, mysqli, gd, mbstring, curl, zip
+- MySQL 8.0.39 throwaway instance, 127.0.0.1:3308 (fresh --initialize-insecure datadir, removed after test)
+- Server: php -S 127.0.0.1:8093 -t <repo> (built-in server; .htaccess rewrite unavailable, so action URLs use the rewrite target /system/handlers/actions.php?action=<name> directly)
+- Database 'ossn' created empty; installer imported 60+ ossn_* tables
+
+### Installation (OSSN wizard, steps driven by HTTP)
+1. GET  /installation/?page=license   -> 200
+2. POST /installation/?action=install (dbuser=root, dbhost=127.0.0.1:3308, dbname=ossn, url=http://127.0.0.1:8093/, datadir=<tmp>/ossn-data-8093/, owner_email/notification_email/sitename set) -> 302 ?page=account (success)
+3. POST /installation/?action=account (username=admin, type=admin, validated) -> 302 ?page=installed
+   DB check: SELECT guid,username,type FROM ossn_users => 1 | admin | admin
+4. POST /installation/?action=finish -> 302 /administrator ; INSTALLED marker file created
+
+### Admin login (prerequisite of the finding: valid site-administrator session)
+- Login page scrapes hidden action token fields: ossn_ts=1790618727, ossn_token=6dac9d25...345a
+- POST /system/handlers/actions.php?action=admin/login (username=admin, password=***) -> 302
+- Proof of authenticated admin session:
+  * ossn_users.last_login updated to 1790618789 for guid=1
+  * session file contains OSSN_USER|O:8:"OssnUser":17:{...s:4:"type";s:5:"admin"...} and flash 'You are now logged in!'
+  * POST action=admin/dynamic/cache (admin-only, registered only when ossn_isAdminLoggedin(), see ossn.lib.admin.php:22-42) executed and rewrote configurations/ossn.config.dcache.php - direct proof the admin gate passed
+
+### Note on action dispatch
+- Production canonical URL /action/<name> is a .htaccess rewrite of system/handlers/actions.php?action=<name> (RewriteRule ^action/([A-Za-z0-9\_\-\/]+)$ system/handlers/actions.php?action=$1). Under php -S the un-rewritten path was used; identical code path (ossn_action(input('action'))).

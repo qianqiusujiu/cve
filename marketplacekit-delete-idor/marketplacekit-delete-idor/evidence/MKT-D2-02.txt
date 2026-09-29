@@ -1,0 +1,29 @@
+MKT-D2-02 — CreateController@deleteUpload missing authorization (DELETE /create/{listing}/image/{uuid})
+Verdict: VERIFIED — any verified user can delete photos from any other user's listing.
+
+Environment: same as MKT-D2-01. Victim listing id=1 owned by user 1 (b@vuln.test),
+photos column = ["img0.png","img1.png","img2.png"]. Attacker = a@evil.test (user 3, separate session).
+
+Route param is Hashids-encoded (app/Providers/RouteServiceProvider.php:36-39,54-57 -> Hashids::decode -> findOrFail);
+hashid of listing 1 = Q81KoWKz3V (encoded with the app's own config via vendor/autoload bootstrap).
+
+Reproduction (attacker session, standard web CSRF token harvested from any page as attacker):
+  DELETE /create/Q81KoWKz3V/image/0   -> 200 {"success":true}   photos: {"1":"img1.png","2":"img2.png"}
+  DELETE /create/Q81KoWKz3V/image/1   -> 200 {"success":true}   photos: {"2":"img2.png"}
+  DELETE /create/Q81KoWKz3V/image/2   -> 200 {"success":true}   photos: []
+  -> attacker fully stripped a victim-owned listing; no ownership check fired at any point.
+
+Code confirmation: app/Http/Controllers/CreateController.php:572-580 deleteUpload() performs
+  $photos=(array)$listing->photos; unset($photos[$uuid]); $listing->photos=$photos; $listing->save();
+  -> no $this->authorize('update', $listing), unlike every other write action in the controller
+     (update L267, getTimes L611, postTimes L631). uuid is the numeric array index (0..n) as audited.
+
+Controls:
+  DELETE without CSRF token (authenticated attacker)  -> 419 (standard Laravel web middleware; every verified
+      user session holds a valid token, so this is not an obstacle for an authenticated attacker)
+  Unauthenticated DELETE -> 419 (auth+isVerified group enforced; no privilege escalation from guest)
+
+Corrections to audit: listing id is not a raw sequential integer in the URL — it is a Hashids token of the
+sequential id; tokens are attacker-visible (public listing URLs /{listing}/{slug}/... bind through the same
+Hashids decode), so enumeration concern becomes "harvest from any public page" rather than "iterate integers".
+Severity/impact unchanged.

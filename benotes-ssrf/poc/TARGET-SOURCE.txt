@@ -1,0 +1,11 @@
+Target source for: benotes Server-Side Request Forgery (Laravel 8)
+
+Repository URL : https://github.com/fr0tt/benotes.git
+Exact commit   : cb803b32340eb7720131a9d0b93261d01800c896  (2023-11-04, master HEAD; version 2.8.1 per composer.json)
+Vulnerable file: app/Services/PostService.php:192-208 (curl_exec); app/Http/Controllers/PostController.php:274-281
+
+Clone commands:
+  git clone https://github.com/fr0tt/benotes.git benotes
+  cd benotes
+  git checkout cb803b32340eb7720131a9d0b93261d01800c896
+  composer install

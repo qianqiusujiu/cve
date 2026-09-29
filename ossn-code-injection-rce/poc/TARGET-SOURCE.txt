@@ -1,0 +1,14 @@
+Target source (vulnerability research snapshot)
+================================================
+
+Repository URL : https://github.com/opensource-socialnetwork/opensource-socialnetwork.git
+Exact commit   : 9983ea40f641eb5f3178e14ddee6f7092a94eb78
+Commit date    : 2026-09-24 00:37:57 +0500
+Branch         : master (HEAD at time of testing; self-identifies as v9.1.0.0)
+Vulnerable file: actions/administrator/cache/dynamic.php (lines 11-17, 77-97)
+Include point  : system/start.php line 34
+
+Clone command:
+git clone https://github.com/opensource-socialnetwork/opensource-socialnetwork.git
+cd opensource-socialnetwork
+git checkout 9983ea40f641eb5f3178e14ddee6f7092a94eb78

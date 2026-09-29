@@ -1,0 +1,10 @@
+Target source for: EasyImages2.0 Arbitrary File Read
+
+Repository URL : https://github.com/icret/EasyImages2.0.git
+Exact commit   : dcb9776cb9567b9280306471a66d96b4b733a0a1  (2026-08-22, master HEAD; APP_VERSION 2.8.7 in app/base.php)
+Vulnerable file: app/hide.php:14-31; app/function.php:561-576 (urlHash); config/config.php:116 (default hide_key)
+
+Clone commands:
+  git clone https://github.com/icret/EasyImages2.0.git easyimages
+  cd easyimages
+  git checkout dcb9776cb9567b9280306471a66d96b4b733a0a1

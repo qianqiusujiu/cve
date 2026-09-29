@@ -1,0 +1,33 @@
+Target source — laravel-easy-pos Hardcoded Default Credentials (CWE-798)
+
+Repository URL:
+  https://github.com/mailmug/laravel-easy-pos
+
+Exact commit tested:
+  40299656b9936cd1e8f08de7bd390df669a348b9  (2026-08-28 20:12:27 +0530, "Fix upload", master branch)
+
+Clone & checkout the identical tested revision:
+
+  git clone https://github.com/mailmug/laravel-easy-pos
+  cd laravel-easy-pos
+  git checkout 40299656b9936cd1e8f08de7bd390df669a348b9
+
+Build & run (the environment used for validation):
+  - PHP 8.4.26 with required extensions, MySQL 8.0 (empty schema)
+  - cp .env.example .env  &&  edit DB_* to point at an EMPTY database schema
+    (empty schema is required: the installer runs whenever the `settings` table is absent)
+  - composer install
+  - php artisan key:generate
+  - npm install && npm run build     # frontend assets; affects panel rendering only,
+                                     # not the installer/login logic
+  - php -S 127.0.0.1:8086 -t public
+
+Vulnerable code anchors at this commit:
+  routes/web.php:18-22,25                 GET / and GET /install -> InstallController@install, no auth middleware
+  app/Http/Controllers/InstallController.php:13-46
+                                          settings-table guard only; migrate --force (L27) + db:seed --force (L30)
+  database/seeders/UserSeeder.php:17-21   hardcoded admin@admin.com / pass@123
+  app/Models/User.php:57-60               canAccessPanel() returns true unconditionally
+
+Validation was performed against this exact revision in a local, isolated
+environment; the temporary environment was destroyed after testing.

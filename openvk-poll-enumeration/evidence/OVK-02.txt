@@ -1,0 +1,37 @@
+OVK-02 — Unauthenticated disclosure of poll options/results/voters bypassing wall privacy
+Verdict: VERIFIED (runtime, end-to-end) — with one prerequisite correction.
+
+Environment: fresh MySQL schema (openvk on 127.0.0.1:3307: chandler/install/init-db.sql + install/init-static-db.sql
++ install/sqls/*), PHP 8.4.26 dev server: php -S 127.0.0.1:8085 -t htdocs htdocs/index.php.
+Instance config: registration open, captcha off. Test user "Poll Tester" (login polltester@example.com, id 2).
+
+Setup of a poll behind a wall guests cannot view:
+  1. profiles.profile_type=1 (CLOSED profile) for user 2; User::canBeViewedBy (Web/Models/Entities/User.php:1600-1640)
+     returns FALSE for guests on closed profiles -> wall + posts are hidden.
+  2. Poll published by user 2 on own wall via POST /wall2/makePost (poll XML attachment), poll id=2
+     ("Secret leadership vote", options 4="Candidate A", 5="Candidate B", is_anonymous=0, 2 votes recorded:
+     user 2 -> Candidate A, user 1 (instance admin) -> Candidate B).
+
+Controls (guest, no session):
+  GET /wall2    (closed profile wall)  -> 302 redirect to / (denied)
+  GET /wall2_2  (the poll post itself) -> 404 (denied)
+  -> the wall/post content is NOT readable by the guest.
+
+Leaks (guest, no session):
+  GET /poll2 -> 200, page contains poll title "Secret leadership vote" and options "Candidate A"/"Candidate B"
+  GET /poll2/voters?option=4 -> 200, page contains voter identity "Poll Tester" (polltester) next to "Candidate A"
+  GET /poll2/voters?option=5 -> 200, page contains "Admin" (instance administrator) next to "Candidate B"
+  (the option query param is base_convert(...,32,10) of the numeric option id; ids are sequential,
+   so /poll{N} and option ids enumerate trivially. /poll1 - a poll on a group wall - leaks identically.)
+
+Root cause (source, this checkout):
+  - Web/Presenters/PollPresenter.php renderView (23-66) / renderVoters (68-102): no auth and no parent-post/wall
+    visibility check; renderVoters only refuses anonymous polls.
+  - Web/Models/Entities/Poll.php:318-327 canBeViewedBy() returns TRUE unconditionally — the delegation to the
+    attached post's visibility is commented out ("waiting for #935").
+
+Correction to audit prerequisite: "closed/private group walls" is NOT the hidden-wall case in current master —
+Club::canBeViewedBy (Web/Models/Entities/Club.php:489-492) only checks the ban flag, so closed-club walls are
+publicly readable by design. The verified restricted-wall case is the CLOSED PROFILE (profile_type=1), where
+/wall{id} and /wall{id}_{post} are denied to guests while /poll{id} still discloses options, results and voters.
+Severity (medium) and root cause unchanged.

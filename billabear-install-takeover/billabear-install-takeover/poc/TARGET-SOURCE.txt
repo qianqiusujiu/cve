@@ -1,0 +1,44 @@
+Target source — BillaBear Missing Authentication (CWE-306)
+
+Repository URL:
+  https://github.com/billabear/billabear
+
+Exact commit tested:
+  3ac15eea19bfff1cdf60b93332b8cb9fe171d51a  (2026-09-13 14:00:36 +0200, "Remove 8.3 from build", master branch)
+
+Clone & checkout the identical tested revision:
+
+  git clone https://github.com/billabear/billabear.git
+  cd billabear
+  git checkout 3ac15eea19bfff1cdf60b93332b8cb9fe171d51a
+
+Build & run (the environment used for validation):
+  - PHP 8.4.26, composer install from composer.lock
+  - PostgreSQL 16 on 127.0.0.1:5433 with a FRESH EMPTY database (the attack window
+    exists only while the schema is not yet created); the shipped docker-compose
+    stack uses postgres+timescaledb and is the affected target - the install path
+    is PostgreSQL-only by design (TimescalePlatform extends PostgreSQLPlatform)
+  - APP_ENV=prod; php -S 127.0.0.1:8087 -t public public/index.php
+  - .env.local: DATABASE_URL pointing at the local PG instance,
+    MESSENGER_TRANSPORT_DSN auto_setup=1, MAILER_DSN=null://null
+  - Environment-compat patches used for the local run (documented and reverted
+    after testing; none touch the audited endpoint or its guards):
+      * config/packages/cache.yaml: apcu/redis adapters -> array
+      * src/BillaBear/Database/Doctrine/TimescalePlatform.php: skip
+        `create extension timescaledb` / create_hypertable() (vanilla PG 16)
+
+Vulnerable code anchors at this commit:
+  src/BillaBear/Controller/InstallController.php:50-100
+        processInstall(): no authentication, no installed-state check;
+        L83-91 creates the attacker-controlled User, setIsConfirmed(true),
+        setRoles([ROLE_ADMIN])
+  src/BillaBear/Controller/InstallController.php:37-52
+        installDefault() (GET /install) - HAS the installed-state check
+        (DoctrineTableException -> installer page, else redirect /login)
+  config/packages/security.yaml
+        firewalls only ^/api/ and ^/app/; access_control only /app/ and /site/
+  src/BillaBear/Install/DatabaseCreator.php:31-37
+        SchemaTool::createSchema throws on existing tables (fail-closed path)
+
+Validation was performed against this exact revision in a local, isolated
+environment; the temporary environment was destroyed after testing.

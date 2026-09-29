@@ -1,0 +1,42 @@
+Target source — MarketplaceKit SQL Injection (CWE-89)
+
+Repository URL:
+  https://github.com/marketplacekit/marketplacekit
+
+Exact commit tested:
+  534aa0eb9981a42115bb139f79ae5433b4483a05  (2019-10-22 15:50:07 +0100, "Forces form builder to open - tries 3x", master branch - last commit)
+
+Clone & checkout the identical tested revision:
+
+  git clone https://github.com/marketplacekit/marketplacekit.git
+  cd marketplacekit
+  git checkout 534aa0eb9981a42115bb139f79ae5433b4483a05
+
+Build & run (the environment used for validation):
+  - PHP 7.4.33 (app requires ^7.1.3); composer deps from composer.lock.
+    Composer 1.x is needed: Composer 2 rejects kylekatarnls/update-helper
+    locked for plugin-api 1.x (validation used Composer 1.10.27)
+  - MySQL (5.6/5.7 semantics required for GeomFromText - see shim note below);
+    validation used MySQL 8.0.39 + the stored-function shim mysql8-geomfromtext-shim.sql
+  - cp .env.example .env; point DB_* at a fresh schema; php artisan key:generate
+  - Register an account and set users.verified = 1 (the isVerified middleware
+    gate; in validation this was done out-of-band to emulate email verification)
+  - php -S 127.0.0.1:8081 server.php
+  - Environment-compat note (validation only, reverted afterwards):
+    vendor/spiritix/lada-cache/.../Redis.php was no-oped because the app writes
+    hit Redis regardless of LADA_CACHE_ACTIVE=false and no local Redis existed;
+    the resulting POST-save 500s occur AFTER the DB write and do not affect the
+    injection.
+
+Vulnerable code anchors at this commit:
+  app/Http/Controllers/Account/ProfileController.php:47-55
+        L50: $user->location = \DB::raw("(GeomFromText('POINT($lat $lng)'))");
+        direct property assignment (not fill() -> not $fillable-protected)
+  app/Http/Requests/UpdateUserProfile.php:29-33
+        rules() validates ONLY username; lat/lng unvalidated
+  routes/web.php:69
+        account prefix group, middleware auth + isVerified;
+        Route::resource('edit_profile','ProfileController')
+
+Validation was performed against this exact revision in a local, isolated
+environment; the temporary environment was destroyed after testing.

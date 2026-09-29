@@ -1,0 +1,23 @@
+TARGET SOURCE
+=============
+Product:      RhaPHP (WeChat official-account management system, ThinkPHP 5.1.35 LTS)
+Repository:   https://github.com/geesondog/rhaphp.git
+Exact commit: 7ae639ccf8dcb627faace096d030bd4cb4cfb905
+Commit date:  2020-11-26 15:18:22 +0800 ("Update 安装协议")
+Branch:       master (no tagged releases; latest master as of 2026-09-27)
+
+Clone commands:
+    git clone https://github.com/geesondog/rhaphp.git
+    git -C rhaphp checkout 7ae639ccf8dcb627faace096d030bd4cb4cfb905
+
+Vulnerable file: application/mp/controller/Show.php (method image(), lines 19-49)
+
+Local test environment notes (environment-only, no changes to the vulnerable code path):
+- PHP built-in server: php -S 127.0.0.1:8080 (docroot = repo root); PoC URLs use the ThinkPHP
+  compat form /index.php?s=/mp/show/image&url=... because the cli-server does not do PATH_INFO.
+  Under Apache/Nginx the equivalent endpoint is /mp/show/image?url=...
+- Throwaway MySQL 8.0.39 on 127.0.0.1:3307 (not required by this particular chain).
+- Marker HTTP service on 127.0.0.1:8899 serving the string "RHA-SSRF-MARKER-9f3ab2c".
+- One framework-level compat patch was applied to thinkphp/library/think/Error.php (swallow
+  E_DEPRECATED/E_NOTICE/E_WARNING) to run ThinkPHP 5.1.35 under local PHP 8.4. It is unrelated
+  to the vulnerability and does not touch application/ code.

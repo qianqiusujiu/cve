@@ -1,0 +1,28 @@
+TARGET SOURCE
+=============
+Product:      FUEL CMS (CodeIgniter 3.1.13)
+Repository:   https://github.com/daylightstudio/FUEL-CMS.git
+Exact commit: 6fd06d421df7444c2e4b32e837a7484939f875e5
+Commit date:  2026-06-01 14:39:12 -0700 ("Update README.md")
+Version:      1.5.2 (fuel/modules/fuel/config/fuel_constants.php: define('FUEL_VERSION', '1.5.2'))
+Branch:       master (latest master as of 2026-09-27)
+
+Clone commands:
+    git clone https://github.com/daylightstudio/FUEL-CMS.git
+    git -C FUEL-CMS checkout 6fd06d421df7444c2e4b32e837a7484939f875e5
+
+Vulnerable file: fuel/modules/fuel/controllers/Blocks.php (layout_fields(), @eval at line 264,
+reachable only inside the if(!empty($id)) branch at line 253)
+
+Local test environment notes (environment-only, no changes to the vulnerable code path):
+- Throwaway MySQL 8.0.39 on 127.0.0.1:3307, database "fuelcms" loaded from fuel/install/fuel_schema.sql.
+- php -S 127.0.0.1:8081 with a router script; DB config pointed at the local temp instance;
+  session save path set for the Windows php -S runtime.
+- $config['admin_enabled'] = TRUE in MY_fuel.php (stock default is FALSE; enabling the admin is the
+  normal deployed configuration and a prerequisite of any authenticated admin-panel bug).
+- A block layout was registered in application/config/MY_fuel_layouts.php (documented Blocks-module
+  configuration):
+    $config['blocks']['verify_block'] = array('label'=>'Verify Block','fields'=>array('copy'=>array('type'=>'textarea','label'=>'Copy')));
+- Admin password set locally to a throwaway value (fuel_users.password = SHA1(CONCAT(password, salt))
+  matching fuel_users_model::salted_password_hash). Never reuse the seeded default admin password.
+- PHP 8.4 compat patch on the CodeIgniter index.php error_reporting only; unrelated to the vuln.

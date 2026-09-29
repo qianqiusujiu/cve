@@ -1,0 +1,12 @@
+Target source for: openvk Poll Information Disclosure
+
+Repository URL : https://github.com/OpenVK/openvk.git
+Exact commit   : 8316cfc7eabf8426603f9b2a582d8396e8dc81b7  (2026-09-20, master HEAD)
+Vulnerable file: Web/Presenters/PollPresenter.php:23-102; Web/Models/Entities/Poll.php:318-327;
+                 Web/routes.yml:324-327
+
+Clone commands (openvk bundles chandler as a git submodule - fetch it too):
+  git clone https://github.com/OpenVK/openvk.git openvk
+  cd openvk
+  git checkout 8316cfc7eabf8426603f9b2a582d8396e8dc81b7
+  git submodule update --init --recursive

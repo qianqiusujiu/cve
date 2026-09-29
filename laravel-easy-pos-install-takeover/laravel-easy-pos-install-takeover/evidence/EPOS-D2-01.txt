@@ -1,0 +1,32 @@
+EPOS-D2-01 — Hardcoded admin credentials (admin@admin.com / pass@123) provisioned by the unauthenticated installer
+Verdict: VERIFIED (end-to-end takeover of a fresh deployment as an unauthenticated attacker).
+
+Environment: laravel-easy-pos (mailmug, 208★) at repos/laravel-easy-pos, composer install from lock (PHP 8.4.26),
+MySQL 8.0 shared instance 127.0.0.1:3307, empty schema `epos11`, `php -S 127.0.0.1:8086 -t public`
+(assets built with `npm run build`; a stock deployment that ships built assets or runs `vite dev` behaves identically
+for the credential part — the build step only affects page rendering of the panel, not the installer/login logic).
+
+Chain reproduced:
+1) Unauthenticated GET http://127.0.0.1:8086/install (no session, no headers beyond default curl):
+   -> 200 "✅ Migrations completed. ... {"message":"Installation completed successfully!"}"
+   app/Http/Controllers/InstallController.php:16-45: Schema::hasTable('settings') false -> Artisan migrate --force +
+   db:seed --force. Same handler is bound to GET / as well (routes/web.php:20) — first page hit installs the app.
+2) Database check: users table now contains id=1 "Admin User" admin@admin.com — created by
+   database/seeders/UserSeeder.php:17-21 with password Hash::make('pass@123') (hardcoded, no rotation workflow).
+3) Login at the Filament panel (/admin/login, Livewire form -> POST /livewire/update, component action
+   "authenticate") with admin@admin.com / pass@123:
+   -> 200, effects.redirect = http://127.0.0.1:8086/admin
+   -> GET /admin with the session: 200, full admin panel rendered (Dashboard, Products, Customers, Orders nav;
+      51,934-byte fi-layout page).
+4) Control: GET /admin WITHOUT the session cookie -> redirected to /admin/login (Filament auth gate).
+   app/Models/User.php:57-60 canAccessPanel() returns true unconditionally, so the seeded account is a full
+   panel administrator with no additional gate.
+
+Code anchors: routes/web.php:20,25 (GET / and GET /install call InstallController@install with no auth middleware);
+InstallController.php:16-45 (no installed-state guard beyond settings-table existence, runs migrate+seed --force);
+database/seeders/UserSeeder.php:17-21 (hardcoded admin@admin.com / pass@123); app/Models/User.php:57-60
+(canAccessPanel() constant true).
+
+Impact: any internet-reachable instance between first boot and manual password change is taken over with one GET
+(/ or /install) plus one public login; the credential pair is public in the repository, so even instances installed
+long ago remain exposed until the operator changes the password (the app has no forced rotation).

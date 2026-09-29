@@ -1,0 +1,42 @@
+Target source — MarketplaceKit Missing Authorization (CWE-862)
+
+Repository URL:
+  https://github.com/marketplacekit/marketplacekit
+
+Exact commit tested:
+  534aa0eb9981a42115bb139f79ae5433b4483a05  (2019-10-22 15:50:07 +0100, "Forces form builder to open - tries 3x", master branch - last commit)
+
+Clone & checkout the identical tested revision:
+
+  git clone https://github.com/marketplacekit/marketplacekit.git
+  cd marketplacekit
+  git checkout 534aa0eb9981a42115bb139f79ae5433b4483a05
+
+Build & run (the environment used for validation):
+  - PHP 7.4.33 (app requires ^7.1.3); composer deps from composer.lock
+    (Composer 1.x needed - see the SQLi package note; validation reused the
+    same local instance)
+  - MySQL; cp .env.example .env; php artisan key:generate; migrate/seed
+  - Two separate registered accounts (victim + attacker), both with
+    users.verified = 1 (out-of-band, emulating email verification)
+  - Give the victim's listing a photos array with a few entries, then take
+    the listing's Hashids token from its public URL
+    (encoded with the instance's app config - tokens differ per install;
+    the validation instance encoded listing id 1 as Q81KoWKz3V)
+  - php -S 127.0.0.1:8081 server.php
+
+Vulnerable code anchors at this commit:
+  app/Http/Controllers/CreateController.php:572-579
+        deleteUpload(): unset($photos[$uuid]); save; NO authorize() call,
+        NO ownership check
+  app/Http/Controllers/CreateController.php:187,267,622,654
+        sibling write actions (store, update, getTimes, postTimes) all call
+        $this->authorize('update', $listing)
+  routes/web.php:92,109
+        auth+isVerified group; Route::delete('/create/{listing}/image/{uuid?}', ...)
+  app/Providers/RouteServiceProvider.php:36-39
+        Route::bind('listing', ...) - Hashids::decode -> findOrFail;
+        tokens are attacker-visible in public listing URLs
+
+Validation was performed against this exact revision in a local, isolated
+environment; the temporary environment was destroyed after testing.
