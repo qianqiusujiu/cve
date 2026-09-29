@@ -26,7 +26,7 @@
 | [easyimages-arbitrary-delete](./easyimages-arbitrary-delete/) | 见目录 README | CWE-22 | gist 已发布·VulDB 待提交 |
 | [openvk-config-read](./openvk-config-read/) | 见目录 README | CWE-22 | gist 已发布·VulDB 待提交 |
 | [openvk-poll-enumeration](./openvk-poll-enumeration/) | 见目录 README | CWE-862 | gist 已发布·VulDB 待提交 |
-| [gitscrum-unauth-upload-rce](./gitscrum-unauth-upload-rce/) | 见目录 README | CWE-434 | gist 已发布·VulDB 待提交 |
+| [gitscrum-unauth-upload-rce](./gitscrum-unauth-upload-rce/) | 见目录 README | CWE-434 | ❌ COVERED(issue #369 在先披露+厂商拒修)勿提交 |
 | [laravel-filemanager-rename-rce](./laravel-filemanager-rename-rce/) | 见目录 README | CWE-22 | gist 已发布·VulDB 待提交 |
 | [hms-auth-bypass](./hms-auth-bypass/) | 见目录 README | CWE-89 | gist 已发布·VulDB 待提交 |
 | [hms-panel-update-sqli](./hms-panel-update-sqli/) | 见目录 README | CWE-89 | gist 已发布·VulDB 待提交 |

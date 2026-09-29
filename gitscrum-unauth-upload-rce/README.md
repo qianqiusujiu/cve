@@ -1,5 +1,6 @@
 # GitScrum Arbitrary File Upload Remote Code Execution (Laravel 5.5)
 
+> ⚠️ **COVERED / 勿提交**: 在先公开披露——gitscrum-core/laravel-gitscrum issue #369(2026-03-04, 15 findings 含本洞: attachments 路由无鉴权+无类型校验+原扩展名落盘 RCE),CSRF 部分更早见 issue #354(2021-12-07, huntr.dev);厂商 renatomarinho 已公开声明仓库弃维、'known and won't be patched'。本目录仅作研究存档,不提交 VulDB。
 **CWE-434 · Unauthenticated unrestricted file upload · Arbitrary PHP code execution on default installations**
 
 > **Vendor:** laravel (https://github.com/laravel)
