@@ -1,5 +1,6 @@
 <!-- gist description (stage 6): LMS-Laravel Message API Missing Authorization (Laravel 8) -->
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**GitHub issue #92 (2026-03-04: missing ownership checks on courses, lessons, MESSAGES, uploads — 精确覆盖)**。本目录仅作研究存档,不提交 VulDB。
 # LMS-Laravel Message API Missing Authorization (Laravel 8)
 
 **CWE-862 · Authenticated missing-authorization (IDOR) on message read/write · any user can dump and inject messages of any Course/Lesson/User**

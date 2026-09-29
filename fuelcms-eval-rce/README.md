@@ -1,5 +1,6 @@
 # FUEL CMS PHP Code Injection (1.5.2)
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**CVE-2018-16763 (VulDB 描述即 Blocks.php layout_fields eval — 同 sink)**。本目录仅作研究存档,不提交 VulDB。
 **CWE-94 · Authenticated (admin session) · Arbitrary PHP code execution via `name` GET parameter in Blocks::layout_fields()**
 
 > **Vendor:** daylightstudio (Daylight Studio)

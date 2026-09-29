@@ -1,5 +1,6 @@
 <!-- gist description (stage 6): EasyImages2.0 Arbitrary File Read -->
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**CVE-2023-7098 (app/hide.php 路径穿越 ../filedir — 同文件同根因)**。本目录仅作研究存档,不提交 VulDB。
 # EasyImages2.0 Arbitrary File Read
 
 **CWE-330 · Unauthenticated arbitrary file read · forgeable hide.php path token (factory-default static crypto key)**

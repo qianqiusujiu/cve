@@ -1,5 +1,6 @@
 # Hospital-Management-System Appointment Cancellation SQL Injection (vanilla PHP + MySQLi)
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**GitHub issue #64/#53 (2026: Systemic SQL Injection + No Authentication — 系统性覆盖)**。本目录仅作研究存档,不提交 VulDB。
 **CWE-89 · Unauthenticated SQL injection (UPDATE) · appointment tampering + time-based blind extraction**
 
 > **Vendor:** kishan0725

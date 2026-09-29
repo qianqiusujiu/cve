@@ -1,5 +1,6 @@
 # laravel-filemanager Rename Path Traversal Remote Code Execution (v2.15.1)
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**CVE-2022-40734 (rename 换扩展名 — 同根因,2.6.4 修复)**。本目录仅作研究存档,不提交 VulDB。
 **CWE-22 · Authenticated path traversal in rename · Arbitrary file move with attacker-controlled extension, leading to remote code execution on default configuration**
 
 > **Vendor:** UniSharp (https://github.com/UniSharp)

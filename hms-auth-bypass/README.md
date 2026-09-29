@@ -1,5 +1,6 @@
 # Hospital-Management-System SQL Injection Authentication Bypass (vanilla PHP + MySQLi)
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**GitHub issue #71 (2026-06-18: 登录SQLi认证绕过 Patient+Doctor — 与本洞一致)**。本目录仅作研究存档,不提交 VulDB。
 **CWE-89 · Unauthenticated SQL injection (login handlers) · full patient and doctor authentication bypass**
 
 > **Vendor:** kishan0725

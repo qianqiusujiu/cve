@@ -1,5 +1,6 @@
 # MarketplaceKit Missing Authorization (Laravel 5.6)
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**GitHub issue #164/#162 (unlink IDOR 与 listing IDOR 模式已在案)**。本目录仅作研究存档,不提交 VulDB。
 **CWE-862 · Authenticated (any verified, non-admin user) missing authorization · delete photos from any listing on the site**
 
 > **Vendor:** marketplacekit (https://github.com/marketplacekit)

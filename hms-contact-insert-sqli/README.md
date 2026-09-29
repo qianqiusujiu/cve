@@ -1,5 +1,6 @@
 # Hospital-Management-System Contact Form SQL Injection (vanilla PHP + MySQLi)
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**GitHub issue #49/#6 (contact form 已有 XSS/注入报告 — 同表单)**。本目录仅作研究存档,不提交 VulDB。
 **CWE-89 · Unauthenticated SQL injection (INSERT) · blind time-based extraction + arbitrary row injection**
 
 > **Vendor:** kishan0725

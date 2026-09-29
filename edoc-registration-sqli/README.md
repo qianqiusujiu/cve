@@ -1,5 +1,6 @@
 # edoc-doctor-appointment-system SQL Injection (patient self-registration)
 
+> ⚠️ **COVERED / 勿提交**: 提报前查重发现在先披露——**CVE-2023-1058 (create-account.php newemail SQLi — 同文件同参数同根因)**。本目录仅作研究存档,不提交 VulDB。
 **CWE-89 · Unauthenticated time-based blind INSERT SQL injection · database enumeration and arbitrary row injection via the public registration flow**
 
 > **Vendor:** HashenUdara
