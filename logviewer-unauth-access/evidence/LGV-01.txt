@@ -22,7 +22,7 @@ HTTP/1.1 200 OK
 Content-Disposition: attachment; filename=laravel-2026-09-30.log
 Content-Type: text/plain; charset=utf-8
 downloaded content: [2026-09-29 16:56:01] local.ERROR: LGV-TEST-ENTRY: sensitive stack trace placeholder user@example.com  
-[2026-09-30 00:56:00] local.ERROR: LGV-TEST-ENTRY secret-token-ABC123 {"exception":"[object] (RuntimeException(code: 0): Sensitive placeholder at <REDACTED-PATH>/routes/web.php:17)"}
+[2026-09-30 00:56:00] local.ERROR: LGV-TEST-ENTRY secret-token-ABC123 {"exception":"[object] (RuntimeException(code: 0): Sensitive placeholder at <app>/routes/web.php:17)"}
 
 ### T4a: DELETE /log-viewer/logs/delete WITHOUT ajax header -> expect 405 (only gate: ajax header, not CSRF/auth)
 <!DOCTYPE html>
@@ -30,10 +30,10 @@ downloaded content: [2026-09-29 16:56:01] local.ERROR: LGV-TEST-ENTRY: sensitive
 <head>
 
 ### T4b: DELETE /log-viewer/logs/delete WITH X-Requested-With: XMLHttpRequest (no CSRF token, no auth, no session) -> destructive delete
-file before: -rw-r--r-- 1 <REDACTED> <REDACTED> 283 Sep 30 00:56 lgv-test/storage/logs/laravel-2026-09-30.log
+file before: -rw-r--r-- 1 <owner> <group> 283 Sep 30 00:56 <app>/storage/logs/laravel-2026-09-30.log
 {"result":"success"}
 HTTP 200
-file after:  ls: cannot access 'lgv-test/storage/logs/laravel-2026-09-30.log': No such file or directory
+file after:  ls: cannot access '<app>/storage/logs/laravel-2026-09-30.log': No such file or directory
 
 ### T5 (confirm dashboard reflects deletion, still unauthenticated):
 GET /log-viewer -> HTTP 200

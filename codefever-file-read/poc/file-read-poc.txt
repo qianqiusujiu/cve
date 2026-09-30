@@ -34,7 +34,7 @@ AFTER the sanitizer has run):
     -> HTTP 302 to /doc/cn/ ; no read.
 
 Same root cause (not separately exercised): _assets() branch
-(doc.php:121-133) serves the same unsanitized $docFile when the basename
+(doc.php:118-133) serves the same unsanitized $docFile when the basename
 matches /^\w{32}\.png$/.
 
 Impact: unauthenticated arbitrary file read on the web server's drive

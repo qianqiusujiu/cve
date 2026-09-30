@@ -97,7 +97,7 @@ A network-positioned attacker can inject arbitrary serialized objects into the T
 
 - Project: https://github.com/ThinkUpLLC/ThinkUp
 - CWE-502 (Deserialization of Untrusted Data): https://cwe.mitre.org/data/definitions/502.html
-- External disclosure: https://gist.github.com/qianqiusujiu/3680ed53160fcdd3e24454b3de0c9b7c
+- External disclosure: [GIST_URL]
 - VulDB submission #xxxxxx
 
 ---

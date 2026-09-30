@@ -11,7 +11,10 @@ import socketserver
 import sys
 import os
 
-PAYLOAD = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'payload.bin'), 'rb').read()
+# Payload file: first CLI argument, default payload.bin next to this script
+# (copy payload-attacker.bin to payload.bin, or pass either .bin file explicitly).
+DEFAULT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'payload.bin')
+PAYLOAD = open(sys.argv[1] if len(sys.argv) > 1 else DEFAULT, 'rb').read()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

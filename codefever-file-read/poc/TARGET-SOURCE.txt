@@ -11,9 +11,9 @@ Clone commands:
     git -C codefever checkout 0c35e60f006f9d558cc33a159baf110659351990
 
 Vulnerable file: application/controllers/doc.php
-    _detail():  L60-110 (L60 raw uri_string, L66-68 $docFile built with no
-                containment, L79 file_exists gate, L99 file_get_contents echo)
-    _assets():  L121-133 (same unsanitized $docFile)
+    _detail():  L37-101 (L39 raw uri_string, L42-44 $docFile built with no
+                containment, L51 file_exists gate, L99 file_get_contents echo)
+    _assets():  L118-133 (same unsanitized $docFile)
 Sanitizer under bypass: system/core/URI.php L222
     str_replace(array('//','../'), '/', trim($uri,'/'))  (CodeIgniter 2.1.1)
 Framework: CodeIgniter 2.1.1 (CI_VERSION in system/core/CodeIgniter.php)

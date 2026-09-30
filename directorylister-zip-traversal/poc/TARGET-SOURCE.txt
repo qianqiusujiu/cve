@@ -7,9 +7,10 @@ Commit date    : 2026-09-07 09:20:15 -0700 (Updated PHP and JS dependencies)
 Tag            : 5.7.0 (HEAD == tag at time of testing; latest release as of 2026-09-29)
 Branch         : master
 Vulnerable file: app/src/Controllers/ZipController.php
-                  (unchecked full_path resolution at lines 46-48; only gate = is_dir();
+                  (unchecked full_path resolution at lines 40-44; only gate = is_dir();
+                   sink: Symfony Finder -> ZipStream at line 54;
                    shared helper: app/config/container.php:115;
-                   dispatch: app/src/Controllers/IndexController.php:22-29)
+                   dispatch: app/src/Controllers/IndexController.php:22-28)
 Verified sha256 of the target file: ef5515cdfb05c90df6e3baad1ef7473e80c499d88a222083ca52bdcb5f22e05b
 
 Clone command:

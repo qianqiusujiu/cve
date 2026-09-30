@@ -95,7 +95,7 @@ A single-use coupon was redeemed three times; three distinct cards were shipped 
 
 - Project: https://github.com/Tai7sy/card-system
 - CWE-362: https://cwe.mitre.org/data/definitions/362.html
-- External disclosure: https://gist.github.com/qianqiusujiu/952e39108f2bd7805a5a7b2cadf1c436
+- External disclosure: [GIST_URL]
 - VulDB submission #xxxxxx
 
 ---

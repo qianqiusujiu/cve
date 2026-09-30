@@ -15,6 +15,13 @@
 | [thinkup-deserialization](./thinkup-deserialization/) | 见目录 README | CWE-502 | gist 已发布·VulDB 待提交 |
 | [logviewer-unauth-access](./logviewer-unauth-access/) | 见目录 README | CWE-306 | gist 已发布·VulDB 待提交 |
 | [directorylister-zip-traversal](./directorylister-zip-traversal/) | 见目录 README | CWE-22 | gist 已发布·VulDB 待提交 |
+| [phpredisadmin-reflected-xss](./phpredisadmin-reflected-xss/) | 见目录 README | CWE-79 | gist 已发布·VulDB 待提交 |
+| [codefever-file-read](./codefever-file-read/) | 见目录 README | CWE-22 | gist 已发布·VulDB 待提交 |
+| [card-system-hardcoded-credentials](./card-system-hardcoded-credentials/) | 见目录 README | CWE-798 | gist 已发布·VulDB 待提交 |
+| [card-system-coupon-toctou](./card-system-coupon-toctou/) | 见目录 README | CWE-362 | gist 已发布·VulDB 待提交 |
+| [thinkup-deserialization](./thinkup-deserialization/) | 见目录 README | CWE-502 | gist 已发布·VulDB 待提交 |
+| [logviewer-unauth-access](./logviewer-unauth-access/) | 见目录 README | CWE-306 | gist 已发布·VulDB 待提交 |
+| [directorylister-zip-traversal](./directorylister-zip-traversal/) | 见目录 README | CWE-22 | gist 已发布·VulDB 待提交 |
 | [ossn-code-injection-rce](./ossn-code-injection-rce/) | 见目录 README | CWE-94 | gist 已发布·VulDB 待提交 |
 | [vesta-path-traversal](./vesta-path-traversal/) | 见目录 README | CWE-22 | gist 已发布·VulDB 待提交 |
 | [opencats-account-takeover](./opencats-account-takeover/) | 见目录 README | CWE-284 | gist 已发布·VulDB 待提交 |

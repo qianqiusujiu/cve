@@ -7,7 +7,7 @@ Vulnerable:   webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php:60
 POP entry:    webapp/_lib/model/class.PostIterator.php:124 (__destruct),
               sink call $this->stmt->closeCursor() at line 127
 Date:         2026-09-27
-Environment:  Windows 10 x64, portable PHP 7.4.33 CLI (local path <REDACTED>, curl ext),
+Environment:  Windows 10 x64, portable PHP 7.4.33 CLI (php.exe, curl ext),
               Python 3.12 MITM simulation server on 127.0.0.1:80
 
 METHOD (on-path attacker simulation, no ThinkUp source modified)
@@ -22,9 +22,9 @@ METHOD (on-path attacker simulation, no ThinkUp source modified)
    byte-for-byte equivalent to an on-path (MITM/ARP/DNS-spoofing) attacker position
    for a plaintext http:// endpoint (CVSS AV:A/AC:H).
 3. env/harness.php includes the REAL, UNMODIFIED files from the audited repo:
-       repos/ThinkUp/webapp/_lib/class.Utils.php                                 (Utils::getURLContents, verbatim)
-       repos/ThinkUp/webapp/_lib/model/class.PostIterator.php                    (gadget class)
-       repos/ThinkUp/webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php (vulnerable class)
+       <checkout>/webapp/_lib/class.Utils.php                                 (Utils::getURLContents, verbatim)
+       <checkout>/webapp/_lib/model/class.PostIterator.php                    (gadget class)
+       <checkout>/webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php (vulnerable class)
    Only Logger is stubbed (log sink; real Logger only writes log files).
    Entry: FlickrAPIAccessor->getFlickrPhotoSource('http://flic.kr/p/2m4yAbC')
    with api_key 'TU01TESTKEY' (mirrors the plugin's runtime call from
@@ -50,14 +50,14 @@ php.exe output (abridged; duplicate display_errors blocks removed):
     [harness] $api_url value (line 29): 'http://api.flickr.com/services/rest/?'
     [harness] calling getFlickrPhotoSource('http://flic.kr/p/2m4yAbC')
     PHP Fatal error:  Uncaught Error: Cannot use object of type PostIterator as array
-        in .../webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php:62
+        in <checkout>/webapp/plugins/expandurls/model/class.FlickrAPIAccessor.php:62
     Stack trace:
-    #0 .../harness.php(42): FlickrAPIAccessor->getFlickrPhotoSource('http://flic.kr/...')
+    #0 <poc>/harness.php(42): FlickrAPIAccessor->getFlickrPhotoSource('http://flic.kr/...')
 
     Next Error: Call to undefined method stdClass::closeCursor()
-        in .../webapp/_lib/model/class.PostIterator.php:127
+        in <checkout>/webapp/_lib/model/class.PostIterator.php:127
     Stack trace:
-    #0 .../harness.php(42): PostIterator->__destruct()
+    #0 <poc>/harness.php(42): PostIterator->__destruct()
 
 MARKER ANALYSIS
 ---------------

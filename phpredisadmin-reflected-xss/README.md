@@ -92,7 +92,7 @@ The attacker's double quote (`page=2"`) closes the `href` attribute; `<svg/onloa
 
 - Project: https://github.com/erikdubbelboer/phpRedisAdmin
 - CWE-79: https://cwe.mitre.org/data/definitions/79.html
-- External disclosure: https://gist.github.com/qianqiusujiu/43d56b2ec741ca6a654bdfbc4e117d9a
+- External disclosure: [GIST_URL]
 - VulDB submission #xxxxxx
 
 ---

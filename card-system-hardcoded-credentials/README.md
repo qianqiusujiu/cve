@@ -11,19 +11,19 @@
 
 ## 1. Summary
 
-The product model `app/Product.php` contains `createApiCards()`, which connects to the vendor's own external card-delivery MySQL database using **hardcoded credentials** (`mysqli_connect('localhost', '<REDACTED>', '<REDACTED>', '<REDACTED>', '3306')`) and writes generated card codes into the `<REDACTED>`.ac_kms table. The code path runs for every order of an API-delivery product (`delivery = DELIVERY_API = 2`) via `Shop\Pay@buy -> shipOrder()`. The credential is therefore a **live, working database credential published in the public repository** — verified end-to-end at runtime (authentication + INSERT succeeded against a locally provisioned server with the same pair).
+The product model `app/Product.php` contains `createApiCards()`, which connects to the vendor's own external card-delivery MySQL database using **hardcoded credentials** (`mysqli_connect('localhost', 'udiddz', '<password>', 'udiddz', '3306')`) and writes generated card codes into the `udiddz.ac_kms` table. The code path runs for every order of an API-delivery product (`delivery = DELIVERY_API = 2`) via `Shop\Pay@buy -> shipOrder()`. The credential is therefore a **live, working database credential published in the public repository** — verified end-to-end at runtime (authentication + INSERT succeeded against a locally provisioned server with the same pair).
 
 ## 2. Root Cause
 
 | File | Location | Role |
 |---|---|---|
-| `app/Product.php` | function `createApiCards()` (single-line source) | hardcoded `mysqli_connect` to the vendor's external card-delivery database |
-| `app/Product.php` | same function | `INSERT INTO `<REDACTED>`.`ac_kms` ...` built by string concatenation |
+| `app/Product.php` | function `createApiCards()` (single-line source) | hardcoded `mysqli_connect` to the vendor's `udiddz` database |
+| `app/Product.php` | same function | `INSERT INTO `udiddz`.`ac_kms` ...` built by string concatenation |
 
 ```php
-$conn = mysqli_connect('localhost', '<REDACTED>', '<REDACTED>', '<REDACTED>', '3306');
+$conn = mysqli_connect('localhost', 'udiddz', '<hardcoded password>', 'udiddz', '3306');
 ...
-$sql = 'INSERT INTO `<REDACTED>`.`ac_kms` (`id`, `km`, `value`, `task`, `udid`, `diz`,
+$sql = 'INSERT INTO `udiddz`.`ac_kms` (`id`, `km`, `value`, `task`, `udid`, `diz`,
         `task_id`, `install_url`, `plist_url`, `jh`, `addtime`, `tjtime`)
         VALUES ' . join(',', $rows);
 ```
@@ -44,15 +44,15 @@ Obtain the credential from the public source:
 git clone https://github.com/Tai7sy/card-system.git
 git -C card-system checkout 4e908dd55f50f1cb6d70eba0d34efb1ec7d74ea3
 grep -o "mysqli_connect([^)]*)" card-system/app/Product.php
-# -> mysqli_connect('localhost', '<REDACTED>', '<REDACTED>', '<REDACTED>', '3306')
+# -> mysqli_connect('localhost', 'udiddz', '<hardcoded password>', 'udiddz', '3306')
 ```
 
 Runtime proof (fully local, isolated instance — Laravel 5.5, PHP 7.4.33, MySQL 8.0.39):
 
-1. Provision a local MySQL with the exact hardcoded pair (`CREATE USER '<REDACTED>'@'localhost' ... ; CREATE DATABASE <REDACTED>; CREATE TABLE ac_kms (...)`); independent `mysql -h 127.0.0.1 -u <REDACTED> -p ...` login confirms the pair authenticates.
+1. Provision a local MySQL with the exact hardcoded pair (`CREATE USER 'udiddz'@'localhost' ... ; CREATE DATABASE udiddz; CREATE TABLE ac_kms (...)`); independent `mysql -h 127.0.0.1 -u udiddz -p ...` login confirms the pair authenticates.
 2. Drive the real shipped path: `POST /api/shop/buy` on an API-delivery product with a full-discount coupon → `paid=0` → `shipOrder()` → `createApiCards()`.
 3. Run #1 (MySQL 8 default `sql_mode`): application log proves the connection with the hardcoded credential **succeeded** and the INSERT was issued — it failed only on the zero-date `sql_mode` rule, which happens *after* successful connect/auth.
-4. Run #2 (zero-date relaxed on the local test server): full end-to-end success — row written into `<REDACTED>`.ac_kms through the hardcoded credential, and the same generated card code delivered to the buyer as a sold card.
+4. Run #2 (zero-date relaxed on the local test server): full end-to-end success — row written into `udiddz.ac_kms` through the hardcoded credential, and the same generated card code delivered to the buyer as a sold card.
 
 ## 5. Confirmed Techniques
 
@@ -62,7 +62,7 @@ Runtime proof (fully local, isolated instance — Laravel 5.5, PHP 7.4.33, MySQL
 
 ## 6. Impact
 
-- Anyone who obtains the public source holds a valid credential for the vendor's card-delivery database (schema name `<REDACTED>` — card/fulfillment records).
+- Anyone who obtains the public source holds a valid credential for the vendor's card-delivery database (`udiddz` schema — card/fulfillment records).
 - If the database host ever becomes reachable (misconfiguration, lateral movement, cloud port exposure), the holder can read and insert card records directly.
 - Password reuse extends the exposure beyond this single host. Real credential values are `<REDACTED>` in public copies of this disclosure (presence and validity documented above).
 
@@ -73,7 +73,7 @@ Runtime proof (fully local, isolated instance — Laravel 5.5, PHP 7.4.33, MySQL
 ## 8. Remediation
 
 - Remove the credentials from source; load them from environment variables or configuration kept outside version control.
-- Rotate the exposed database password immediately.
+- Rotate the exposed `udiddz` password immediately.
 - Restrict database network access (bind to localhost / private network, firewall rules).
 - Enable secret scanning on the repository and purge the secret from git history.
 
@@ -81,7 +81,7 @@ Runtime proof (fully local, isolated instance — Laravel 5.5, PHP 7.4.33, MySQL
 
 - Project: https://github.com/Tai7sy/card-system
 - CWE-798: https://cwe.mitre.org/data/definitions/798.html
-- External disclosure: https://gist.github.com/qianqiusujiu/456434356e004668a923d9f6db8f5885
+- External disclosure: [GIST_URL]
 - VulDB submission #xxxxxx
 
 ---

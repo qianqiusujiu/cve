@@ -13,6 +13,8 @@
 
 Unless the integrating application sets the `ARCANEDEV_LOGVIEWER_MIDDLEWARE` environment variable, the package registers **all** of its routes with `middleware => null` (`config/log-viewer.php:56-60`), keeping them out of Laravel's `web` group — so no session authentication and no CSRF protection apply. In that shipped default state any anonymous user can open the log dashboard, list all retained logs, download any raw `laravel-YYYY-MM-DD.log`, and **delete any log file** with a single request that merely carries the `X-Requested-With: XMLHttpRequest` header.
 
+> **Dedup note (different root cause):** the package's repository already carries two reflected-XSS reports — issues [#467](https://github.com/ARCANEDEV/LogViewer/issues/467) ("Reflected DOM-Based XSS") and [#443](https://github.com/ARCANEDEV/LogViewer/issues/443) ("Version 4.7.1 Reflected XSS"). Both concern output encoding when rendering log content; this finding is a different vulnerability class (CWE-306, missing authentication), a different root cause (the route-middleware default in `config/log-viewer.php`), and different code paths (route registration, not view rendering).
+
 ## 2. Root Cause
 
 | File | Line | Role |
@@ -86,7 +88,7 @@ Any anonymous remote user of an affected deployment can read every retained appl
 
 - Project: https://github.com/ARCANEDEV/LogViewer
 - CWE-306 (Missing Authentication for Critical Function): https://cwe.mitre.org/data/definitions/306.html
-- External disclosure: https://gist.github.com/qianqiusujiu/42f4387861d43600ff77d7aebf6f6755
+- External disclosure: [GIST_URL]
 - VulDB submission #xxxxxx
 
 ---

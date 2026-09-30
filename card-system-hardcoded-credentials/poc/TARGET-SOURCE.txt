@@ -12,8 +12,8 @@ Clone commands:
 
 Vulnerable file: app/Product.php (source shipped as a single-line minified file)
     function createApiCards(): hardcoded mysqli_connect to the vendor's
-    external card-delivery MySQL database (schema name <REDACTED>) + INSERT INTO
-    `<REDACTED>`.`ac_kms` built by string concatenation.
+    external 'udiddz' card-delivery MySQL database + INSERT INTO
+    `udiddz`.`ac_kms` built by string concatenation.
 Runtime entry path: POST /api/shop/buy (API-delivery product, delivery=2)
     -> app/Http/Controllers/Shop/Pay.php buy() -> shipOrder()
     -> delivery === DELIVERY_API branch -> Product::createApiCards($order)
@@ -22,8 +22,8 @@ Framework: Laravel 5.5
 Local test environment notes (environment-only, no external system contacted):
 - Fully installed local instance: Laravel 5.5, PHP 7.4.33, MySQL 8.0.39.
 - A LOCAL MySQL server was provisioned with the exact hardcoded username/
-  password pair found in the source (CREATE USER '<REDACTED>'@'localhost' ...;
-  CREATE DATABASE <REDACTED>; CREATE TABLE ac_kms (...)) to prove the shipped
+  password pair found in the source (CREATE USER 'udiddz'@'localhost' ...;
+  CREATE DATABASE udiddz; CREATE TABLE ac_kms (...)) to prove the shipped
   credential is live and functional.
 - The real shipped entry path was exercised (POST /api/shop/buy with an
   API-delivery product and a full-discount coupon so paid=0 and shipOrder()

@@ -18,8 +18,10 @@ git checkout ac41d11625d9a2421f4edad397a21300f82d2836
 
 PoC usage (harmless object-injection probe only):
 1. Pin api.flickr.com to 127.0.0.1 in the local hosts file (simulates the on-path attacker).
-2. python serve_payload.py            # answers every GET with payload.bin (attacker probe)
+2. python serve_payload.py payload-attacker.bin
+   # answers every GET with the probe bytes (default filename if omitted: payload.bin)
 3. Edit harness.php $REPO to point at the checked-out repo's webapp/ directory.
 4. php harness.php TU01TESTKEY http://flic.kr/p/2m4yAbC
-5. Control run: serve payload-benign.bin instead -> clean exit 0 (differential).
+5. Control run (differential): restart with `python serve_payload.py payload-benign.bin`
+   -> clean exit 0.
 6. Cleanup: remove the hosts entry and flush the DNS cache.

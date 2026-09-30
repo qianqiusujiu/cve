@@ -44,9 +44,9 @@ Auth      : none. All requests sent with NO cookies (response Set-Cookie is issu
      (grep hits for dbdriver/hostname/permitted_uri_chars in body: 4)
 
 [T4] GET /doc/cn/....//....//....//....//....//....//<marker-file>
-     (6 dot-segment hops, escapes the repo root entirely; target = a benign marker file placed outside the repository root for the test)
+     (6 dot-segment hops, escapes the repo root entirely)
   -> HTTP 200 OK, body 28690 bytes; body contains the marker heading of the target
-     file (marker filename and heading <REDACTED> found; content not quoted here).
+     file (marker heading text <REDACTED> found; content not quoted here).
      Confirms arbitrary-depth traversal to any same-drive path readable by the
      PHP process, not just sibling directories.
 

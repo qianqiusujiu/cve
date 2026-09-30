@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-The `GET /?zip=<dir>` endpoint resolves the user-supplied path through the shared `full_path` helper (`app/config/container.php:115`) — a raw `files_path . '/' . $path` concatenation with no normalization and no containment check — and `ZipController` gates it only with `is_dir()` (`app/src/Controllers/ZipController.php:46-48`). The hidden `app_files` list (`app`, `app/**`, `.env`, …) is never consulted, and `../` segments are not filtered, so any unauthenticated user can download a zip archive of any directory under the `open_basedir` scope — including directories outside `files_path` — exfiltrating the entire application tree in one request.
+The `GET /?zip=<dir>` endpoint resolves the user-supplied path through the shared `full_path` helper (`app/config/container.php:115`) — a raw `files_path . '/' . $path` concatenation with no normalization and no containment check — and `ZipController` gates it only with `is_dir()` (`app/src/Controllers/ZipController.php:40-44`). The hidden `app_files` list (`app`, `app/**`, `.env`, …) is never consulted, and `../` segments are not filtered, so any unauthenticated user can download a zip archive of any directory under the `open_basedir` scope — including directories outside `files_path` — exfiltrating the entire application tree in one request.
 
 > **Dedup note (partial overlap, disclosed honestly):** the same project's `?file=` parameter path traversal was previously disclosed (GitHub issue #1456 on the upstream repository, 2025-10-09). This finding is the **distinct `?zip=` endpoint** — different parameter, different controller (`ZipController`, `is_dir()`-only gate vs `FileController`) and different sink (bulk directory archive vs single-file stream) — while partially overlapping the prior issue in the shared unchecked `full_path` resolution helper.
 
@@ -19,14 +19,14 @@ The `GET /?zip=<dir>` endpoint resolves the user-supplied path through the share
 
 | File | Line | Role |
 |---|---|---|
-| `app/config/container.php` | 113 | `'app_files' => ['app', 'app/**', 'index.php', '.analytics', '.customizations.html', '.env', '.env.example', '.hidden']` — the list ZipController ignores |
+| `app/config/container.php` | 112 | `'app_files' => ['app', 'app/**', 'index.php', '.analytics', '.customizations.html', '.env', '.env.example', '.hidden']` — the list ZipController ignores |
 | `app/config/container.php` | 115 | `'full_path'` helper: `files_path . '/' . $path` — **raw concat, no normalization, no containment check** |
-| `app/src/Controllers/IndexController.php` | 22-29 | dispatch on the first query-param key: `zip` → `ZipController` |
-| `app/src/Controllers/ZipController.php` | 46-48 | `$path = $this->container->call('full_path', ...)`; `if (! $this->zipDownloads \|\| ! is_dir($path)) return 404;` — **the only gate is `is_dir()`** |
-| `app/src/Controllers/ZipController.php` | 58-59 | Symfony Finder (`dotfiles ignored by default`) → ZipStream archive to the client |
+| `app/src/Controllers/IndexController.php` | 22-28 | dispatch on the first query-param key: `zip` → `ZipController` |
+| `app/src/Controllers/ZipController.php` | 40-44 | `$path = $this->container->call('full_path', ['path' => $request->getQueryParams()['zip']]);` then `if (! $this->zipDownloads \|\| ! is_dir($path)) return 404;` — **the only gate is `is_dir()`** |
+| `app/src/Controllers/ZipController.php` | 54 | Symfony Finder `$this->finder->in($path)->files()` (dotfiles ignored by default) → ZipStream archive to the client |
 
 ```php
-// app/src/Controllers/ZipController.php:46-48
+// app/src/Controllers/ZipController.php:40-44
 $path = $this->container->call('full_path', ['path' => $request->getQueryParams()['zip']]);
 
 if (! $this->zipDownloads || ! is_dir($path)) {          // only gate: is_dir()
@@ -82,7 +82,7 @@ Any unauthenticated remote user can bulk-exfiltrate complete application trees i
 - Project: https://github.com/DirectoryLister/DirectoryLister
 - Prior related disclosure on the same project: `?file=` path traversal, upstream GitHub issue #1456 (2025-10-09)
 - CWE-22 (Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')): https://cwe.mitre.org/data/definitions/22.html
-- External disclosure: https://gist.github.com/qianqiusujiu/bdcb3d6fec4ca1e10c398492f438a0b0
+- External disclosure: [GIST_URL]
 - VulDB submission #xxxxxx
 
 ---

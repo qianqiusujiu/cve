@@ -17,19 +17,19 @@ The public documentation route `GET /doc/<lang>/<path>` is handled by `applicati
 
 | File | Lines | Role |
 |---|---|---|
-| `application/controllers/doc.php` | 60-68 | `_detail()` — URI string → filesystem path, no containment |
-| `application/controllers/doc.php` | 79 | `file_exists($docFile)` — accepts any existing path |
+| `application/controllers/doc.php` | 39-44 | `_detail()` — URI string → filesystem path, no containment |
+| `application/controllers/doc.php` | 51 | `file_exists($docFile)` — accepts any existing path |
 | `application/controllers/doc.php` | 99 | `file_get_contents($docFile)` echoed into the doc view |
-| `application/controllers/doc.php` | 121-133 | `_assets()` — same unsanitized `$docFile` via `finfo`/`fopen`/`echo` |
+| `application/controllers/doc.php` | 118-133 | `_assets()` — same unsanitized `$docFile` via `finfo`/`fopen`/`echo` |
 | `system/core/URI.php` | 222 | CI 2.1.1 sanitizer — `str_replace(array('//','../'), '/', ...)` |
 
 ```php
 // application/controllers/doc.php (_detail)
-$path    = $this->uri->uri_string;                    // L60 - raw URI
-$segments = explode('/', $path);                      // L62
-$rootDir  = implode('/', [dirname(APPPATH), 'doc', $docPath]) . '/';  // L66
-$docDir   = array_slice($segments, 2);                // L67
-$docFile  = $rootDir . implode('/', $docDir);         // L68 - NO containment check
+$path    = $this->uri->uri_string;                    // L39 - raw URI
+$segments = explode('/', $path);                      // L40
+$rootDir  = implode('/', [dirname(APPPATH), 'doc', $docPath]) . '/';  // L42
+$docDir   = array_slice($segments, 2);                // L43
+$docFile  = $rootDir . implode('/', $docDir);         // L44 - NO containment check
 ...
 $this->load->view('doc/detail', [ ..., 'doc' => str_replace('`','\\`', file_get_contents($docFile)) ]); // L99
 ```
@@ -72,7 +72,7 @@ Confirmed results (unmodified application, real routing/controllers/views):
 
 - `....//` str_replace-reordering bypass (2 and 6 hops), `curl --path-as-is`, no cookies sent.
 - `file_exists()` gating passes for any existing path; content echoed verbatim inside the doc view.
-- `_assets()` branch (doc.php:121-133) shares the same unsanitized `$docFile` (reached when the basename matches `/^\w{32}\.png$/`) — same root cause, not separately exercised.
+- `_assets()` branch (doc.php:118-133) shares the same unsanitized `$docFile` (reached when the basename matches `/^\w{32}\.png$/`) — same root cause, not separately exercised.
 
 ## 6. Impact
 
@@ -95,7 +95,7 @@ Confirmed results (unmodified application, real routing/controllers/views):
 - Project: https://github.com/PGYER/codefever
 - CWE-22: https://cwe.mitre.org/data/definitions/22.html
 - Distinct from CVE-2023-26817 (RCE) and CVE-2023-44080 (branchList) — different files and root causes
-- External disclosure: https://gist.github.com/qianqiusujiu/1ab3ac0baedc7522ce52f3848c9e9b79
+- External disclosure: [GIST_URL]
 - VulDB submission #xxxxxx
 
 ---
